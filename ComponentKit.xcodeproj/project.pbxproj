@@ -263,6 +263,22 @@
 		03F1ABFE1D2B2A9B00867584 /* ComponentKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0B47AB51CBD924100BB33CE /* ComponentKit.framework */; };
 		03F1ABFF1D2B2A9B00867584 /* libComponentKitTestHelpers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A273801A1AFD144100E6F222 /* libComponentKitTestHelpers.a */; };
 		03F1AC021D2B2A9B00867584 /* OCMock.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D04977E31CC4145E0046CBCC /* OCMock.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		16C44C82231923E800738F0D /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C772319236800738F0D /* CKGenericDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C832319241A00738F0D /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C772319236800738F0D /* CKGenericDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C86231924CB00738F0D /* CKTableViewDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C84231924CB00738F0D /* CKTableViewDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C87231924CB00738F0D /* CKTableViewDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C84231924CB00738F0D /* CKTableViewDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C88231924CB00738F0D /* CKTableViewDataSource.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C85231924CB00738F0D /* CKTableViewDataSource.mm */; };
+		16C44C89231924CB00738F0D /* CKTableViewDataSource.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C85231924CB00738F0D /* CKTableViewDataSource.mm */; };
+		16C44C8B2319252600738F0D /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C8A2319251B00738F0D /* CKTableViewDataSourceDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C8C2319252800738F0D /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C8A2319251B00738F0D /* CKTableViewDataSourceDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16C44C8F2319263800738F0D /* CKTableViewDataSourceCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C8D2319263800738F0D /* CKTableViewDataSourceCell.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		16C44C902319263800738F0D /* CKTableViewDataSourceCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C8D2319263800738F0D /* CKTableViewDataSourceCell.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		16C44C912319263800738F0D /* CKTableViewDataSourceCell.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C8E2319263800738F0D /* CKTableViewDataSourceCell.mm */; };
+		16C44C922319263800738F0D /* CKTableViewDataSourceCell.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C8E2319263800738F0D /* CKTableViewDataSourceCell.mm */; };
+		16C44C95231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C93231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		16C44C96231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h in Headers */ = {isa = PBXBuildFile; fileRef = 16C44C93231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		16C44C97231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C94231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm */; };
+		16C44C98231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16C44C94231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm */; };
 		18644AE51B3CB8E60028AF87 /* CKStatefulViewComponentControllerTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE11B3CB8E60028AF87 /* CKStatefulViewComponentControllerTests.mm */; };
 		18644AE61B3CB8E60028AF87 /* CKStatefulViewReusePoolTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE21B3CB8E60028AF87 /* CKStatefulViewReusePoolTests.mm */; };
 		18644AE71B3CB8E60028AF87 /* CKTestStatefulViewComponent.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE41B3CB8E60028AF87 /* CKTestStatefulViewComponent.mm */; };
@@ -1075,6 +1091,14 @@
 		03DED2BC2226015900CD63FF /* CKDataSourceSplitChangesetModification.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CKDataSourceSplitChangesetModification.mm; sourceTree = "<group>"; };
 		03DED2BD2226015900CD63FF /* CKDataSourceSplitChangesetModification.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CKDataSourceSplitChangesetModification.h; sourceTree = "<group>"; };
 		03F1AC061D2B2A9B00867584 /* ComponentKitTestsAppleTV.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ComponentKitTestsAppleTV.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		16C44C772319236800738F0D /* CKGenericDataSource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CKGenericDataSource.h; sourceTree = "<group>"; };
+		16C44C84231924CB00738F0D /* CKTableViewDataSource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CKTableViewDataSource.h; sourceTree = "<group>"; };
+		16C44C85231924CB00738F0D /* CKTableViewDataSource.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CKTableViewDataSource.mm; sourceTree = "<group>"; };
+		16C44C8A2319251B00738F0D /* CKTableViewDataSourceDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CKTableViewDataSourceDelegate.h; sourceTree = "<group>"; };
+		16C44C8D2319263800738F0D /* CKTableViewDataSourceCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CKTableViewDataSourceCell.h; sourceTree = "<group>"; };
+		16C44C8E2319263800738F0D /* CKTableViewDataSourceCell.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CKTableViewDataSourceCell.mm; sourceTree = "<group>"; };
+		16C44C93231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CKComponentBoundsAnimation+UITableView.h"; sourceTree = "<group>"; };
+		16C44C94231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "CKComponentBoundsAnimation+UITableView.mm"; sourceTree = "<group>"; };
 		18644AE11B3CB8E60028AF87 /* CKStatefulViewComponentControllerTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CKStatefulViewComponentControllerTests.mm; sourceTree = "<group>"; };
 		18644AE21B3CB8E60028AF87 /* CKStatefulViewReusePoolTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CKStatefulViewReusePoolTests.mm; sourceTree = "<group>"; };
 		18644AE31B3CB8E60028AF87 /* CKTestStatefulViewComponent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CKTestStatefulViewComponent.h; sourceTree = "<group>"; };
@@ -2164,6 +2188,7 @@
 		D0B47B0E1CBD926700BB33CE /* DataSources */ = {
 			isa = PBXGroup;
 			children = (
+				16C44C772319236800738F0D /* CKGenericDataSource.h */,
 				D0B47B111CBD926700BB33CE /* CKCollectionViewDataSourceCell.h */,
 				D0B47B121CBD926700BB33CE /* CKCollectionViewDataSourceCell.mm */,
 				D0B47B131CBD926700BB33CE /* CKCollectionViewDataSource.h */,
@@ -2174,6 +2199,13 @@
 				72E9B98222329686004E3B90 /* CKCollectionViewDataSourceInternal.h */,
 				D0B47B151CBD926700BB33CE /* CKComponentBoundsAnimation+UICollectionView.h */,
 				D0B47B161CBD926700BB33CE /* CKComponentBoundsAnimation+UICollectionView.mm */,
+				16C44C8A2319251B00738F0D /* CKTableViewDataSourceDelegate.h */,
+				16C44C84231924CB00738F0D /* CKTableViewDataSource.h */,
+				16C44C85231924CB00738F0D /* CKTableViewDataSource.mm */,
+				16C44C8D2319263800738F0D /* CKTableViewDataSourceCell.h */,
+				16C44C8E2319263800738F0D /* CKTableViewDataSourceCell.mm */,
+				16C44C93231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h */,
+				16C44C94231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm */,
 				D0B47B171CBD926700BB33CE /* CKSupplementaryViewDataSource.h */,
 				D0B47B181CBD926700BB33CE /* Common */,
 			);
@@ -2534,6 +2566,7 @@
 				72ECF0F322FE392C008C2D00 /* CKComponentCreationValidation.h in Headers */,
 				03B8B4DC1D2A346F00EDFF59 /* CKStatefulViewComponentController.h in Headers */,
 				D6A0CF8822844556000CC4D0 /* CKAnimation.h in Headers */,
+				16C44C832319241A00738F0D /* CKGenericDataSource.h in Headers */,
 				03B8B4DF1D2A346F00EDFF59 /* CKComponent.h in Headers */,
 				03B8B4E11D2A346F00EDFF59 /* CKComponentController.h in Headers */,
 				D68927F8225B6091009DBBD9 /* CKLinkable.h in Headers */,
@@ -2553,6 +2586,7 @@
 				03B8B4F21D2A346F00EDFF59 /* CKDataSourceConfiguration.h in Headers */,
 				B1E3067C1E8B0EAA004864CF /* CKBuildComponent.h in Headers */,
 				7279B64520E2801D00A50F6E /* CKDataSourceQOS.h in Headers */,
+				16C44C902319263800738F0D /* CKTableViewDataSourceCell.h in Headers */,
 				03B8B4F31D2A346F00EDFF59 /* CKComponentHostingViewDelegate.h in Headers */,
 				EB14A3421D8267DF0004BECF /* CKAutoSizedImageComponent.h in Headers */,
 				03B8B4F41D2A346F00EDFF59 /* CKTextComponentView.h in Headers */,
@@ -2587,6 +2621,7 @@
 				03B8B50C1D2A346F00EDFF59 /* CKComponentSizeRangeProviding.h in Headers */,
 				03B8B50D1D2A346F00EDFF59 /* CKSizeRange.h in Headers */,
 				03B8B50E1D2A346F00EDFF59 /* CKComponentScope.h in Headers */,
+				16C44C87231924CB00738F0D /* CKTableViewDataSource.h in Headers */,
 				03B8B5101D2A346F00EDFF59 /* CKComponentViewAttribute.h in Headers */,
 				03B8B5111D2A346F00EDFF59 /* CKDataSourceChange.h in Headers */,
 				23EA314521A2E57400FEC59C /* CKTreeNodeTypes.h in Headers */,
@@ -2617,6 +2652,7 @@
 				03B8B5241D2A346F00EDFF59 /* CKRatioLayoutComponent.h in Headers */,
 				23309AA82045C60B00833BDB /* CKRenderComponentProtocol.h in Headers */,
 				03B8B5251D2A346F00EDFF59 /* CKNetworkImageComponent.h in Headers */,
+				16C44C96231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h in Headers */,
 				03B8B5271D2A346F00EDFF59 /* CKImageComponent.h in Headers */,
 				60D7B3BE20FC90500011AB3B /* YGFloatOptional.h in Headers */,
 				03B8B5291D2A346F00EDFF59 /* CKStaticLayoutComponent.h in Headers */,
@@ -2690,6 +2726,7 @@
 				03B8B5561D2A346F00EDFF59 /* CKComponentScopeFrame.h in Headers */,
 				7259D5762099E53000451280 /* CKDataSourceModificationHelper.h in Headers */,
 				60D7B3C420FC90500011AB3B /* YGMacros.h in Headers */,
+				16C44C8C2319252800738F0D /* CKTableViewDataSourceDelegate.h in Headers */,
 				03B8B5571D2A346F00EDFF59 /* CKComponentInternal.h in Headers */,
 				03B8B5581D2A346F00EDFF59 /* CKTextKitRendererCache.h in Headers */,
 				60EFF4C321135FCD00CA7C68 /* CKStatelessComponent.h in Headers */,
@@ -2756,6 +2793,7 @@
 				23309AA42045C5F300833BDB /* CKRenderComponentProtocol.h in Headers */,
 				D0B47D431CBD948E00BB33CE /* CKDataSourceInternal.h in Headers */,
 				D0B47D271CBD948E00BB33CE /* CKComponentProvider.h in Headers */,
+				16C44C86231924CB00738F0D /* CKTableViewDataSource.h in Headers */,
 				D0B47CF61CBD948E00BB33CE /* CKComponentLayout.h in Headers */,
 				D0B47D3F1CBD948E00BB33CE /* CKDataSourceAppliedChanges.h in Headers */,
 				72C410672241659F0025D6B5 /* CKComponentAttachControllerInternal.h in Headers */,
@@ -2798,6 +2836,7 @@
 				23B65AC9213FF9300049FFAC /* CKRenderComponent.h in Headers */,
 				D0B47D491CBD948E00BB33CE /* CKDataSourceStateInternal.h in Headers */,
 				D0B47D581CBD948E00BB33CE /* CKComponentGestureActionsInternal.h in Headers */,
+				16C44C8F2319263800738F0D /* CKTableViewDataSourceCell.h in Headers */,
 				23D26A4822440C5B0087350C /* CKCollectionViewDataSourceListener.h in Headers */,
 				D4F1FAC322940023002932E7 /* CKBaseRenderContext.h in Headers */,
 				D0B47D341CBD948E00BB33CE /* CKOverlayLayoutComponent.h in Headers */,
@@ -2821,6 +2860,7 @@
 				23D26A5622440E7D0087350C /* CKCollectionViewDataSourceListenerAnnouncer.h in Headers */,
 				7279B64420E2801D00A50F6E /* CKDataSourceQOS.h in Headers */,
 				D0B47CFE1CBD948E00BB33CE /* CKComponentViewAttribute.h in Headers */,
+				16C44C95231926A900738F0D /* CKComponentBoundsAnimation+UITableView.h in Headers */,
 				239F2CFC21E8F26F00580F93 /* CKRootTreeNode.h in Headers */,
 				D0B47D641CBD948E00BB33CE /* CKTextComponentView.h in Headers */,
 				D0B47D4A1CBD948E00BB33CE /* CKDataSourceChange.h in Headers */,
@@ -2906,6 +2946,7 @@
 				D0B47D791CBD948E00BB33CE /* CKFunctor.h in Headers */,
 				D0B47CE71CBD948E00BB33CE /* CKArgumentPrecondition.h in Headers */,
 				D0B47D771CBD948E00BB33CE /* CKAsyncTransactionGroup.h in Headers */,
+				16C44C8B2319252600738F0D /* CKTableViewDataSourceDelegate.h in Headers */,
 				D0B47D721CBD948E00BB33CE /* CKAsyncLayerInternal.h in Headers */,
 				D0B47D5C1CBD948E00BB33CE /* CKMutex.h in Headers */,
 				D0B47D7A1CBD948E00BB33CE /* CKHighlightOverlayLayer.h in Headers */,
@@ -2926,6 +2967,7 @@
 				D0B47D711CBD948E00BB33CE /* CKAsyncLayer.h in Headers */,
 				238695681FE0571D00D4DAE2 /* CKComponentControllerProtocol.h in Headers */,
 				D0B47D0D1CBD948E00BB33CE /* CKComponentScopeRoot.h in Headers */,
+				16C44C82231923E800738F0D /* CKGenericDataSource.h in Headers */,
 				2DBF1D7A1D3425ED004F28E8 /* CKDetectDuplicateComponent.h in Headers */,
 				D0B47CE81CBD948E00BB33CE /* CKAssert.h in Headers */,
 				D0B47D6C1CBD948E00BB33CE /* CKTextKitRenderer.h in Headers */,
@@ -3358,6 +3400,7 @@
 				03B8B4701D2A346F00EDFF59 /* CKNetworkImageComponent.mm in Sources */,
 				7FB5C1EE1F865BF500D2726B /* CKComponentDescriptionHelper.mm in Sources */,
 				23F25B69212C251D00BB0A3F /* CKRenderHelpers.mm in Sources */,
+				16C44C89231924CB00738F0D /* CKTableViewDataSource.mm in Sources */,
 				23770A1222EB205E00858140 /* CKSystraceScope.mm in Sources */,
 				60D7B3B020FC90500011AB3B /* YGLayout.cpp in Sources */,
 				03B8B4711D2A346F00EDFF59 /* CKComponent.mm in Sources */,
@@ -3424,8 +3467,10 @@
 				EB14A3441D8267DF0004BECF /* CKAutoSizedImageComponent.mm in Sources */,
 				239F2CFF21E8F26F00580F93 /* CKRootTreeNode.mm in Sources */,
 				230ADF731FC5FBEB001570A3 /* CKComponentEvents.mm in Sources */,
+				16C44C98231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm in Sources */,
 				03B8B49F1D2A346F00EDFF59 /* CKStaticLayoutComponent.mm in Sources */,
 				03B8B4A01D2A346F00EDFF59 /* CKStatefulViewComponent.mm in Sources */,
+				16C44C922319263800738F0D /* CKTableViewDataSourceCell.mm in Sources */,
 				60D7B3AC20FC90500011AB3B /* YGConfig.cpp in Sources */,
 				03B8B4A11D2A346F00EDFF59 /* CKStatefulViewComponentController.mm in Sources */,
 				2322A217224504B1006BFCD2 /* CKCollectionViewDataSourceListenerAnnouncer.mm in Sources */,
@@ -3729,6 +3774,7 @@
 				60D7B3C720FC90500011AB3B /* Utils.cpp in Sources */,
 				60D7B3C520FC90500011AB3B /* YGStyle.cpp in Sources */,
 				D0B47CAD1CBD943400BB33CE /* CKComponentHostingView.mm in Sources */,
+				16C44C912319263800738F0D /* CKTableViewDataSourceCell.mm in Sources */,
 				D0B47CAE1CBD943400BB33CE /* CKComponentRootView.mm in Sources */,
 				D0B47CAF1CBD943400BB33CE /* CKBackgroundLayoutComponent.mm in Sources */,
 				A2E5BDC31EB9303D00444CD9 /* CKComponentKey.mm in Sources */,
@@ -3737,6 +3783,7 @@
 				D0B47CB11CBD943400BB33CE /* CKInsetComponent.mm in Sources */,
 				D0B47CB21CBD943400BB33CE /* CKOverlayLayoutComponent.mm in Sources */,
 				D0B47CB31CBD943400BB33CE /* CKRatioLayoutComponent.mm in Sources */,
+				16C44C88231924CB00738F0D /* CKTableViewDataSource.mm in Sources */,
 				EB14A3431D8267DF0004BECF /* CKAutoSizedImageComponent.mm in Sources */,
 				D0B47CB71CBD943400BB33CE /* CKStaticLayoutComponent.mm in Sources */,
 				D0B47CB81CBD943400BB33CE /* CKStatefulViewComponent.mm in Sources */,
@@ -3814,6 +3861,7 @@
 				D0B47CDF1CBD943400BB33CE /* CKTextKitTailTruncater.mm in Sources */,
 				D0B47CE01CBD943400BB33CE /* CKAsyncLayer.mm in Sources */,
 				D6C3B05F20B71DBE0089F06A /* CKComponentAnimations.mm in Sources */,
+				16C44C97231926A900738F0D /* CKComponentBoundsAnimation+UITableView.mm in Sources */,
 				D0B47CE11CBD943400BB33CE /* CKAsyncTransaction.m in Sources */,
 				D0B47CE21CBD943400BB33CE /* CKAsyncTransactionContainer.m in Sources */,
 				D0B47CE31CBD943400BB33CE /* CKAsyncTransactionGroup.m in Sources */,
@@ -3896,7 +3944,7 @@
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = ComponentKit;
 				SDKROOT = appletvos;
-				TVOS_DEPLOYMENT_TARGET = 9.1;
+				TVOS_DEPLOYMENT_TARGET = 11.4;
 			};
 			name = Debug;
 		};
@@ -3910,7 +3958,7 @@
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = ComponentKit;
 				SDKROOT = appletvos;
-				TVOS_DEPLOYMENT_TARGET = 9.1;
+				TVOS_DEPLOYMENT_TARGET = 11.4;
 			};
 			name = Release;
 		};
@@ -4224,6 +4272,8 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.4;
 			};
 			name = Debug;
 		};
@@ -4233,6 +4283,8 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.4;
 			};
 			name = Release;
 		};

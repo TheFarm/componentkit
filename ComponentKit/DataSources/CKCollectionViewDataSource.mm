@@ -201,9 +201,26 @@ static void applyChangesToCollectionView(UICollectionView *collectionView,
   return [_currentState objectAtIndexPath:indexPath].model;
 }
 
+- (NSIndexPath *)indexPathForModel:(id)model
+{
+  __block NSIndexPath *foundIndexPath = nil;
+  [_currentState enumerateObjectsUsingBlock:^(CKDataSourceItem *item, NSIndexPath *indexPath, BOOL *stop) {
+    if ([item.model isEqual:model]) {
+      foundIndexPath = indexPath;
+      *stop = YES;
+    }
+  }];
+  return foundIndexPath;
+}
+
 - (CGSize)sizeForItemAtIndexPath:(NSIndexPath *)indexPath
 {
   return [_currentState objectAtIndexPath:indexPath].rootLayout.size();
+}
+
+- (CGFloat)heightForItemAtIndexPath:(NSIndexPath *)indexPath
+{
+    return [self sizeForItemAtIndexPath:indexPath].height;
 }
 
 #pragma mark - Reload
@@ -242,6 +259,7 @@ static NSString *const kReuseIdentifier = @"com.component_kit.collection_view_da
   CKCollectionViewDataSourceCell *cell = [_collectionView dequeueReusableCellWithReuseIdentifier:kReuseIdentifier forIndexPath:indexPath];
   [cell.rootView setAllowTapPassthrough:_allowTapPassthroughForCells];
   attachToCell(cell, [_currentState objectAtIndexPath:indexPath], _attachController, _cellToItemMap);
+  [cell.rootView setTransform:collectionView.transform];
   return cell;
 }
 

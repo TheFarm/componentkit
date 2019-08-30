@@ -12,6 +12,7 @@
 
 #import <ComponentKit/CKDataSource.h>
 #import <ComponentKit/CKSupplementaryViewDataSource.h>
+#import <ComponentKit/CKGenericDataSource.h>
 
 /**
  This class is an implementation of a `UICollectionViewDataSource` that can be used along with components. For each set of changes (i.e insertion/deletion/update
@@ -22,7 +23,7 @@
  then the `UICollectionView` *ask* the datasource for the data. Here the model is  more Reactive, from an external prospective, the datasource is *told* what
  changes to apply and then *tell* the collection view to apply the corresponding changes.
  */
-@interface CKCollectionViewDataSource : NSObject
+@interface CKCollectionViewDataSource : NSObject <CKGenericDataSource>
 
 /**
  @param collectionView The collectionView is held strongly and its datasource property will be set to the receiver.
@@ -45,12 +46,19 @@
 
 /**
  @return The model associated with a certain index path in the collectionView.
-
- As stated above components are generated asynchronously and on a backgorund thread. This means that a changeset is enqueued
+ 
+ As stated above components are generated asynchronously and on a background thread. This means that a changeset is enqueued
  and applied asynchronously when the corresponding component tree is generated. For this reason always use this method when you
  want to retrieve the model associated to a certain index path in the table view (e.g in didSelectRowAtIndexPath: )
  */
 - (id<NSObject>)modelForItemAtIndexPath:(NSIndexPath *)indexPath;
+
+/**
+ @return The index path associated with a certain object in the table view.
+ 
+ As stated above components are generated asynchronously and on a background thread.
+ */
+- (NSIndexPath *)indexPathForModel:(id)model;
 
 /**
  @return The layout size of the component tree at a certain indexPath. Use this to access the component sizes for instance in a
