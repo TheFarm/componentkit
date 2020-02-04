@@ -218,18 +218,21 @@
 		16E48A0C23E9FC4900840FB1 /* CKComponentBoundsAnimation+UITableView.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0523E9FC4800840FB1 /* CKComponentBoundsAnimation+UITableView.h */; };
 		16E48A0D23E9FC4900840FB1 /* CKTableViewDataSourceCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0623E9FC4800840FB1 /* CKTableViewDataSourceCell.h */; };
 		16E48A0E23E9FC4900840FB1 /* CKTableViewDataSource.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A0723E9FC4800840FB1 /* CKTableViewDataSource.mm */; };
-		16E48A0F23E9FC4900840FB1 /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0823E9FC4800840FB1 /* CKTableViewDataSourceDelegate.h */; };
+		16E48A0F23E9FC4900840FB1 /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0823E9FC4800840FB1 /* CKTableViewDataSourceDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		16E48A1023E9FC4900840FB1 /* CKTableViewDataSourceCell.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A0923E9FC4800840FB1 /* CKTableViewDataSourceCell.mm */; };
-		16E48A1123E9FC4900840FB1 /* CKTableViewDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0A23E9FC4900840FB1 /* CKTableViewDataSource.h */; };
+		16E48A1123E9FC4900840FB1 /* CKTableViewDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0A23E9FC4900840FB1 /* CKTableViewDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		16E48A1223E9FC4900840FB1 /* CKComponentBoundsAnimation+UITableView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A0B23E9FC4900840FB1 /* CKComponentBoundsAnimation+UITableView.mm */; };
 		16E48A1323EA01D900840FB1 /* CKTableViewDataSource.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A0723E9FC4800840FB1 /* CKTableViewDataSource.mm */; };
 		16E48A1423EA01E100840FB1 /* CKTableViewDataSourceCell.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A0923E9FC4800840FB1 /* CKTableViewDataSourceCell.mm */; };
-		16E48A1523EA01E700840FB1 /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0823E9FC4800840FB1 /* CKTableViewDataSourceDelegate.h */; };
-		16E48A1723EA037E00840FB1 /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A1623EA037E00840FB1 /* CKGenericDataSource.h */; };
-		16E48A1823EA037E00840FB1 /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A1623EA037E00840FB1 /* CKGenericDataSource.h */; };
+		16E48A1523EA01E700840FB1 /* CKTableViewDataSourceDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0823E9FC4800840FB1 /* CKTableViewDataSourceDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16E48A1723EA037E00840FB1 /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A1623EA037E00840FB1 /* CKGenericDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16E48A1823EA037E00840FB1 /* CKGenericDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A1623EA037E00840FB1 /* CKGenericDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		16E48A1B23EA0A9600840FB1 /* CKDictionaryTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A1923EA0A9500840FB1 /* CKDictionaryTests.mm */; };
 		16E48A1C23EA0A9600840FB1 /* CKSizeRangeTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A1A23EA0A9600840FB1 /* CKSizeRangeTests.mm */; };
 		16E48A1E23EA0AB700840FB1 /* CKDataSourceSplitChangesetTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 16E48A1D23EA0AB700840FB1 /* CKDataSourceSplitChangesetTests.mm */; };
+		16E48A1F23EA17DC00840FB1 /* CKTableViewDataSource.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0A23E9FC4900840FB1 /* CKTableViewDataSource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		16E48A2A23EA17EA00840FB1 /* CKTableViewDataSourceCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0623E9FC4800840FB1 /* CKTableViewDataSourceCell.h */; };
+		16E48A2B23EA182200840FB1 /* CKComponentBoundsAnimation+UITableView.h in Headers */ = {isa = PBXBuildFile; fileRef = 16E48A0523E9FC4800840FB1 /* CKComponentBoundsAnimation+UITableView.h */; };
 		18644AE51B3CB8E60028AF87 /* CKStatefulViewComponentControllerTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE11B3CB8E60028AF87 /* CKStatefulViewComponentControllerTests.mm */; };
 		18644AE61B3CB8E60028AF87 /* CKStatefulViewReusePoolTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE21B3CB8E60028AF87 /* CKStatefulViewReusePoolTests.mm */; };
 		18644AE71B3CB8E60028AF87 /* CKTestStatefulViewComponent.mm in Sources */ = {isa = PBXBuildFile; fileRef = 18644AE41B3CB8E60028AF87 /* CKTestStatefulViewComponent.mm */; };
@@ -3302,6 +3305,7 @@
 				03B8B4FB1D2A346F00EDFF59 /* CKDataSourceState.h in Headers */,
 				03B8B4FC1D2A346F00EDFF59 /* CKDataSourceListener.h in Headers */,
 				03B8B4FD1D2A346F00EDFF59 /* CKDataSource.h in Headers */,
+				16E48A2B23EA182200840FB1 /* CKComponentBoundsAnimation+UITableView.h in Headers */,
 				03B8B4FE1D2A346F00EDFF59 /* CKDataSourceListenerAnnouncer.h in Headers */,
 				03B8B4FF1D2A346F00EDFF59 /* CKDataSourceItem.h in Headers */,
 				03B8B5001D2A346F00EDFF59 /* CKDataSourceStateInternal.h in Headers */,
@@ -3332,6 +3336,7 @@
 				03B8B5171D2A346F00EDFF59 /* CKTextComponentLayerHighlighter.h in Headers */,
 				03B8B5181D2A346F00EDFF59 /* CKDataSourceItemInternal.h in Headers */,
 				234B582E232BC72E0041B616 /* CKSingleChildComponent.h in Headers */,
+				16E48A2A23EA17EA00840FB1 /* CKTableViewDataSourceCell.h in Headers */,
 				03B8B51B1D2A346F00EDFF59 /* ComponentKit.h in Headers */,
 				D4BC576123E3765C0075D688 /* CKMutex.h in Headers */,
 				03B8B51C1D2A346F00EDFF59 /* CKComponentControllerInternal.h in Headers */,
@@ -3442,6 +3447,7 @@
 				D634A28022DB71460085D697 /* ComponentBuilder.h in Headers */,
 				03B8B5591D2A346F00EDFF59 /* CKAsyncTransactionContainer+Private.h in Headers */,
 				03B8B55A1D2A346F00EDFF59 /* CKComponentSubclass.h in Headers */,
+				16E48A1F23EA17DC00840FB1 /* CKTableViewDataSource.h in Headers */,
 				03B8B55B1D2A346F00EDFF59 /* CKTextKitTailTruncater.h in Headers */,
 				03B8B55C1D2A346F00EDFF59 /* CKAsyncTransactionContainer.h in Headers */,
 				230ADF721FC5FBE8001570A3 /* CKComponentEvents.h in Headers */,

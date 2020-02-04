@@ -147,6 +147,7 @@
 #import <ComponentKit/CKTreeNodeProtocol.h>
 #import <ComponentKit/CKTreeNodeTypes.h>
 #import <ComponentKit/CKTableViewDataSource.h>
+#import <ComponentKit/CKTableViewDataSourceDelegate.h>
 #import <ComponentKit/CKUpdateMode.h>
 #import <ComponentKit/CKVariant.h>
 #import <ComponentKit/CKViewConfiguration.h>
