@@ -12,13 +12,13 @@
 #import <vector>
 
 @interface CKComponentBoundsAnimationTableViewContext : NSObject
-- (instancetype)initWithTableView:(UITableView *)tv;
+- (instancetype)initWithTableView:(UITableView *)tv heightChange:(CGFloat)heightChange;
 - (void)applyBoundsAnimationToTableView:(const CKComponentBoundsAnimation &)animation;
 @end
 
-id CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(UITableView *tv)
+id CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(UITableView *tv, CGFloat heightChange)
 {
-  return [[CKComponentBoundsAnimationTableViewContext alloc] initWithTableView:tv];
+  return [[CKComponentBoundsAnimationTableViewContext alloc] initWithTableView:tv heightChange:heightChange];
 }
 
 void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const CKComponentBoundsAnimation &animation)
@@ -35,7 +35,7 @@ void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const
   NSDictionary *_indexPathsToOriginalLayoutAttributes;
 }
 
-- (instancetype)initWithTableView:(UITableView *)tableView
+- (instancetype)initWithTableView:(UITableView *)tableView heightChange:(CGFloat)heightChange
 {
   if (self = [super init]) {
     _tableView = tableView;
@@ -49,10 +49,11 @@ void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const
     const CGSize visibleSize = tableView.bounds.size;
     const CGRect visibleRect = { tableView.contentOffset, visibleSize };
     
-    // Obviously we want to animate all visible cells. But what about cells that were not previously visible, but become
-    // visible as a result of an item becoming smaller? We grab the layout attributes of a few more items that are
-    // offscreen so that we can animate them too. (Only some, though; we don't attempt to get *all* layout attributes.)
-    const CGFloat offscreenHeight = visibleSize.height / 2;
+    // visible as a result of an item becoming smaller (heightChange < 0)? We grab the layout attributes of a few more
+    // items that are offscreen so that we can animate them too. (Only some, though; we don't attempt to get *all*
+    // layout attributes.) If an item becomes bigger, no additional cells would become visible, so there's no need to
+    // extend the rectangle.
+    const CGFloat offscreenHeight = heightChange > 0 ? 0 : -heightChange;
     const CGRect extendedRect = { visibleRect.origin, { visibleSize.width, visibleSize.height + offscreenHeight } };
     
     NSMutableDictionary *indexPathsToSnapshotViews = [NSMutableDictionary dictionary];

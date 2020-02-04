@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <memory>
 
 #import <ComponentKit/CKBuildComponent.h>
@@ -38,15 +42,13 @@
  @param size The size for this component
  @param children The positioned children for this component. Normally this parameter is ignored.
  @param supercomponent This component's parent component
- @param systraceListener The current systrace listener - will be nil if systrace is not enabled.
  @return An updated mount context. In most cases, this is just be the passed-in context. If a view was created, this is
  used to specify that subcomponents should be mounted inside the view.
  */
 - (CK::Component::MountResult)mountInContext:(const CK::Component::MountContext &)context
                                         size:(const CGSize)size
                                     children:(std::shared_ptr<const std::vector<CKComponentLayoutChild>>)children
-                              supercomponent:(CKComponent *)supercomponent
-                            systraceListener:(id<CKSystraceListener>)systraceListener NS_REQUIRES_SUPER;
+                              supercomponent:(CKComponent *)supercomponent NS_REQUIRES_SUPER;
 
 /**
  For internal use only; don't use this initializer.
@@ -64,31 +66,15 @@
  */
 - (void)setViewConfiguration:(const CKComponentViewConfiguration &)viewConfiguration;
 
-/**
- Unmounts the component:
- - Clears the references to supercomponent and superview.
- - If the component has a _mountedView:
-   - Clears the view's reference back to this component using CKSetMountedComponentForView().
-   - Clears _mountedView.
- */
-- (void)unmount;
-
-- (const CKComponentViewConfiguration &)viewConfiguration;
-
 - (id)nextResponderAfterController;
 
 /**
- Called when the component and all its children have been mounted.
-
- @param systraceListener The current systrace listener - will be nil if systrace is not enabled.
+ A CKComponentViewConfiguration specifies the class of a view and the attributes that should be applied to it.
  */
-- (void)childrenDidMount:(id<CKSystraceListener>)systraceListener;
+- (const CKComponentViewConfiguration &)viewConfiguration;
 
 /** Used to get the root component in the responder chain; don't touch this. */
 @property (nonatomic, weak) UIView *rootComponentMountedView;
-
-/** For internal use only; don't touch this. */
-@property (nonatomic, strong, readonly) id<NSObject> scopeFrameToken;
 
 /** The size that was passed into the component; don't touch this. */
 @property (nonatomic, assign, readonly) CKComponentSize size;
@@ -96,13 +82,18 @@
 /** Used to get the scope root enumerator; during component creation only */
 @property (nonatomic, strong, readonly) id<CKComponentScopeEnumeratorProvider> scopeEnumeratorProvider;
 
-/** If the component owns its own view and is mounted, returns it. */
-@property (nonatomic, readonly) UIView *mountedView;
-
 /** For internal use only; don't touch this. */
 @property (nonatomic, strong, readonly) CKComponentScopeHandle *scopeHandle;
 
 /** For internal debug use only; don't touch this. */
 - (NSString *)backtraceStackDescription;
 
+/**
+ Update component in controller right after new generation is created.
+ NOTE: This should only be used by ComponentKit infra.
+ */
++ (BOOL)shouldUpdateComponentInController;
+
 @end
+
+#endif

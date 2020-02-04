@@ -11,6 +11,10 @@
 #import "CKDataSource.h"
 #import "CKDataSourceInternal.h"
 
+
+#import <ComponentKit/CKMutex.h>
+#import <ComponentKit/CKRootTreeNode.h>
+
 #import "CKComponentControllerEvents.h"
 #import "CKComponentEvents.h"
 #import "CKComponentControllerInternal.h"
@@ -33,7 +37,7 @@
 #import "CKDataSourceStateModifying.h"
 #import "CKDataSourceUpdateConfigurationModification.h"
 #import "CKDataSourceUpdateStateModification.h"
-#import "CKMutex.h"
+#import "CKSystraceScope.h"
 
 @interface CKDataSourceModificationPair : NSObject
 
@@ -49,12 +53,15 @@
 {
   CKDataSourceState *_state;
   CKDataSourceListenerAnnouncer *_announcer;
-  
+
   CKComponentStateUpdatesMap _pendingAsynchronousStateUpdates;
   CKComponentStateUpdatesMap _pendingSynchronousStateUpdates;
   NSMutableArray<id<CKDataSourceStateModifying>> *_pendingAsynchronousModifications;
+  BOOL _processingAsynchronousModification;
+  BOOL _shouldPauseStateUpdates;
+  BOOL _isBackgroundMode;
   dispatch_queue_t _workQueue;
-  
+
   CKDataSourceViewport _viewport;
   BOOL _changesetSplittingEnabled;
   id<CKDataSourceChangesetModificationGenerator> _changesetModificationGenerator;
@@ -230,12 +237,39 @@
   [_announcer removeListener:listener];
 }
 
+- (void)setShouldPauseStateUpdates:(BOOL)shouldPauseStateUpdates
+{
+  CKAssertMainThread();
+  _shouldPauseStateUpdates = shouldPauseStateUpdates;
+  if (!_shouldPauseStateUpdates) {
+    [self _processStateUpdates];
+  }
+}
+
+- (BOOL)shouldPauseStateUpdates
+{
+  CKAssertMainThread();
+  return _shouldPauseStateUpdates;
+}
+
+- (void)setIsBackgroundMode:(BOOL)isBackgroundMode
+{
+  CKAssertMainThread();
+  _isBackgroundMode = isBackgroundMode;
+}
+
+- (BOOL)isBackgroundMode
+{
+  CKAssertMainThread();
+  return _isBackgroundMode;
+}
+
 #pragma mark - State Listener
 
 - (void)componentScopeHandle:(CKComponentScopeHandle *)handle
               rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
        didReceiveStateUpdate:(id (^)(id))stateUpdate
-                    metadata:(const CKStateUpdateMetadata)metadata
+                    metadata:(const CKStateUpdateMetadata &)metadata
                         mode:(CKUpdateMode)mode
 {
   CKAssertMainThread();
@@ -294,15 +328,18 @@
   CKAssertMainThread();
 
   id<CKDataSourceStateModifying> modification = _pendingAsynchronousModifications.firstObject;
-  if (_pendingAsynchronousModifications.count > 0) {
+  if (!_processingAsynchronousModification && _pendingAsynchronousModifications.count > 0) {
+    _processingAsynchronousModification = YES;
     CKDataSourceModificationPair *modificationPair =
     [[CKDataSourceModificationPair alloc]
      initWithModification:modification
      state:_state];
 
+    auto const asyncModification = CK::Analytics::willStartAsyncBlock(CK::Analytics::BlockName::DataSourceWillStartModification);
     dispatch_block_t block = blockUsingDataSourceQOS(^{
+      CKSystraceScope modificationScope(asyncModification);
       [self _applyModificationPair:modificationPair];
-    }, [modification qos]);
+    }, [modification qos], _isBackgroundMode);
 
     dispatch_async(_workQueue, block);
   }
@@ -324,7 +361,7 @@
 
 - (void)_synchronouslyApplyModification:(id<CKDataSourceStateModifying>)modification
 {
-  [_announcer componentDataSource:self willSyncApplyModificationWithUserInfo:[modification userInfo]];
+  [_announcer dataSource:self willSyncApplyModificationWithUserInfo:[modification userInfo]];
   [self _synchronouslyApplyChange:[modification changeFromState:_state] qos:modification.qos];
 }
 
@@ -336,6 +373,15 @@
   CKDataSourceState *const newState = [change state];
   _state = newState;
 
+  // Announce 'didInit'.
+  for (CKComponentController *componentController in change.addedComponentControllers) {
+    [componentController didInit];
+  }
+  for (NSIndexPath *insertedIndex in [appliedChanges insertedIndexPaths]) {
+    CKDataSourceItem *insertedItem = [newState objectAtIndexPath:insertedIndex];
+    CKComponentScopeRootAnnounceControllerInitialization([insertedItem scopeRoot]);
+  }
+
   // Announce 'invalidateController'.
   for (CKComponentController *componentController in change.invalidComponentControllers) {
     [componentController invalidateController];
@@ -344,14 +390,12 @@
     CKDataSourceItem *removedItem = [previousState objectAtIndexPath:removedIndex];
     CKComponentScopeRootAnnounceControllerInvalidation([removedItem scopeRoot]);
   }
-  if (newState.configuration.options.updateComponentInControllerAfterBuild) {
-    CKComponentUpdateComponentForComponentControllerWithIndexPaths(appliedChanges.finalUpdatedIndexPaths.allValues, newState);
-  }
 
-  [_announcer componentDataSource:self
-           didModifyPreviousState:previousState
-                        withState:newState
-                byApplyingChanges:appliedChanges];
+  CKComponentUpdateComponentForComponentControllerWithIndexPaths(appliedChanges.finalUpdatedIndexPaths.allValues,
+                                                                 newState,
+                                                                 newState.configuration.options.updateComponentInControllerAfterBuild.valueOr(NO));
+
+  [_announcer dataSource:self didModifyPreviousState:previousState withState:newState byApplyingChanges:appliedChanges];
 
   // Announce 'didPrepareLayoutForComponent:'.
   CKComponentSendDidPrepareLayoutForComponentsWithIndexPaths([[appliedChanges finalUpdatedIndexPaths] allValues], newState);
@@ -360,7 +404,7 @@
   // Handle deferred changeset (if there is one)
   auto const deferredChangeset = [change deferredChangeset];
   if (deferredChangeset != nil) {
-    [_announcer componentDataSource:self willApplyDeferredChangeset:deferredChangeset];
+    [_announcer dataSource:self willApplyDeferredChangeset:deferredChangeset];
     id<CKDataSourceStateModifying> const modification =
     [self _changesetGenerationModificationForChangeset:deferredChangeset
                                               userInfo:[appliedChanges userInfo]
@@ -384,6 +428,10 @@
 - (void)_processStateUpdates
 {
   CKAssertMainThread();
+  if (_shouldPauseStateUpdates) {
+    return;
+  }
+
   CKDataSourceUpdateStateModification *const asyncStateUpdateModification = [self _consumePendingAsynchronousStateUpdates];
   if (asyncStateUpdateModification != nil) {
     [self _enqueueModification:asyncStateUpdateModification];
@@ -423,16 +471,16 @@
 
 - (void)_applyModificationPair:(CKDataSourceModificationPair *)modificationPair
 {
-  [_announcer componentDataSourceWillGenerateNewState:self userInfo:modificationPair.modification.userInfo];
+  [_announcer dataSource:self willGenerateNewStateWithUserInfo:modificationPair.modification.userInfo];
   CKDataSourceChange *change;
   @autoreleasepool {
     change = [modificationPair.modification changeFromState:modificationPair.state];
   }
-  [_announcer componentDataSource:self
-              didGenerateNewState:[change state]
-                          changes:[change appliedChanges]];
+  [_announcer dataSource:self didGenerateNewState:[change state] changes:[change appliedChanges]];
 
+  auto const asyncApplyModification = CK::Analytics::willStartAsyncBlock(CK::Analytics::BlockName::DataSourceWillApplyModification);
   dispatch_async(dispatch_get_main_queue(), ^{
+    CKSystraceScope applyModificationScope(asyncApplyModification);
     // If the first object in _pendingAsynchronousModifications is not still the modification,
     // it may have been canceled; don't apply it.
     if ([_pendingAsynchronousModifications firstObject] == modificationPair.modification && self->_state == modificationPair.state) {
@@ -440,6 +488,7 @@
       [self _synchronouslyApplyChange:change qos:modificationPair.modification.qos];
     }
 
+    _processingAsynchronousModification = NO;
     [self _startAsynchronousModificationIfNeeded];
   });
 }
@@ -466,7 +515,8 @@
     [[CKDataSourceChangesetModification alloc] initWithChangeset:changeset
                                                    stateListener:self
                                                         userInfo:userInfo
-                                                             qos:qos];
+                                                             qos:qos
+                                         shouldValidateChangeset:NO];
   }
 }
 

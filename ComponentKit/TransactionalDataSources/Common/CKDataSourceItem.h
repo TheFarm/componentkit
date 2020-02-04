@@ -8,14 +8,20 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
+
+#import <ComponentKit/CKCategorizable.h>
 #import <ComponentKit/CKComponentBoundsAnimation.h>
 #import <ComponentKit/CKComponentRootLayoutProvider.h>
 
 struct CKComponentRootLayout;
 @class CKComponentScopeRoot;
 
-@interface CKDataSourceItem : NSObject <CKComponentRootLayoutProvider>
+@interface CKDataSourceItem : NSObject <CKComponentRootLayoutProvider, CKCategorizable>
 
 /** The model used to compute the layout */
 @property (nonatomic, strong, readonly) id model;
@@ -27,3 +33,5 @@ struct CKComponentRootLayout;
 @property (nonatomic, readonly) CKComponentBoundsAnimation boundsAnimation;
 
 @end
+
+#endif

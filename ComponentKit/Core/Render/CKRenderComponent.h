@@ -8,22 +8,29 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 
 #import <ComponentKit/CKComponent.h>
+#import <ComponentKit/CKSingleChildComponent.h>
 #import <ComponentKit/CKRenderComponentProtocol.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 /*
 @warning Overriding -layoutThatFits:parentSize: or -computeLayoutThatFits: is **not allowed** for any subclass.
 */
 
-@interface CKRenderComponent : CKComponent <CKRenderWithChildComponentProtocol>
+@interface CKRenderComponent : CKSingleChildComponent <CKRenderWithChildComponentProtocol>
 
 /**
  Returns a child component that needs to be rendered from this component.
 
  @param state The current state of the component.
  */
-- (CKComponent *)render:(id)state;
+- (CKComponent * _Nullable)render:(id _Nullable)state;
 
 /**
  Returns view configuration for the component.
@@ -36,3 +43,7 @@
 - (CKComponentViewConfiguration)viewConfigurationWithState:(id)state;
 
 @end
+
+NS_ASSUME_NONNULL_END
+
+#endif

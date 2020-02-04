@@ -7,39 +7,12 @@
 
 #import "CKTableViewDataSourceCell.h"
 
+#import <ComponentKit/CKDelayedNonNull.h>
+
 #import <ComponentKit/CKComponentRootView.h>
 
 @implementation CKTableViewDataSourceCell {
-  CKComponentRootView *_rootView;
-}
-
-- (instancetype)init
-{
-  self = [super init];
-  if (self) {
-    _rootView = [[CKComponentRootView alloc] initWithFrame:CGRectZero];
-    [_rootView setBackgroundColor:[UIColor clearColor]];
-    [[self contentView] addSubview:_rootView];
-    [[self contentView] setBackgroundColor:[UIColor clearColor]];
-    [self setBackgroundColor:[UIColor clearColor]];
-  }
-  return self;
-}
-
-
-- (void)awakeFromNib
-{
-  [super awakeFromNib];
-  
-  if (!_rootView) {
-    // Ideally we could simply cause the cell's existing contentView to be of type CKComponentRootView.
-    // Alas the only way to do this is via private API (_contentViewClass) so we are forced to add a subview.
-    _rootView = [[CKComponentRootView alloc] initWithFrame:CGRectZero];
-    [_rootView setBackgroundColor:[UIColor clearColor]];
-    [[self contentView] addSubview:_rootView];
-    [[self contentView] setBackgroundColor:[UIColor clearColor]];
-    [self setBackgroundColor:[UIColor clearColor]];
-  }
+  CK::DelayedNonNull<CKComponentRootView *> _rootView;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -47,35 +20,32 @@
   if (self = [super initWithFrame:frame]) {
     // Ideally we could simply cause the cell's existing contentView to be of type CKComponentRootView.
     // Alas the only way to do this is via private API (_contentViewClass) so we are forced to add a subview.
-    _rootView = [[CKComponentRootView alloc] initWithFrame:CGRectZero];
-    [_rootView setBackgroundColor:[UIColor clearColor]];
+    _rootView = CK::makeNonNull([[CKComponentRootView alloc] initWithFrame:CGRectZero]);
     [[self contentView] addSubview:_rootView];
-    [[self contentView] setBackgroundColor:[UIColor clearColor]];
-    [self setBackgroundColor:[UIColor clearColor]];
   }
   return self;
 }
 
-
-- (CKComponentRootView *)rootView
+- (CK::NonNull<CKComponentRootView *>)rootView
 {
-  if (!_rootView) {
-    _rootView = [[CKComponentRootView alloc] initWithFrame:CGRectZero];
-    [_rootView setBackgroundColor:[UIColor clearColor]];
-    [[self contentView] addSubview:_rootView];
-    [[self contentView] setBackgroundColor:[UIColor clearColor]];
-    [self setBackgroundColor:[UIColor clearColor]];
-  }
   return _rootView;
 }
-
 
 - (void)layoutSubviews
 {
   [super layoutSubviews];
-  
   const CGSize size = [[self contentView] bounds].size;
   [_rootView setFrame:CGRectMake(0, 0, size.width, size.height)];
+}
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
+{
+  UIView *hitView = [super hitTest:point withEvent:event];
+  // `hitTest` should purely rely on `CKComponentRootView`.
+  if (hitView == self || hitView == self.contentView) {
+    return nil;
+  }
+  return hitView;
 }
 
 @end

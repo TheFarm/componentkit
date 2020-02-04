@@ -17,19 +17,7 @@
 #import "CKComponentScopeRoot.h"
 #import "CKThreadLocalComponentScope.h"
 #import "CKScopeTreeNode.h"
-#import "CKScopeTreeNodeWithChild.h"
-
-static Class<CKComponentScopeFrameProtocol> getFrameClass(const CKUnifyComponentTreeConfig & unifyComponentTreeConfig,
-                                                          Class __unsafe_unretained componentClass) {
-  if (unifyComponentTreeConfig.enable) {
-    if (unifyComponentTreeConfig.useSingleChildScopeNodeForCompositeComponent &&
-        componentClass == [CKCompositeComponent class]) {
-      return [CKScopeTreeNodeWithChild class];
-    }
-    return [CKScopeTreeNode class];
-  }
-  return [CKComponentScopeFrame class];
-}
+#import "CKTreeNodeProtocol.h"
 
 CKComponentScope::~CKComponentScope()
 {
@@ -37,7 +25,7 @@ CKComponentScope::~CKComponentScope()
     [_scopeHandle resolve];
 
     if (_threadLocalScope->systraceListener) {
-      auto const componentClass = _threadLocalScope->stack.top().frame.handle.componentClass;
+      auto const componentClass = _threadLocalScope->stack.top().frame.scopeHandle.componentClass;
       [_threadLocalScope->systraceListener didBuildComponent:componentClass];
     }
 
@@ -54,23 +42,30 @@ CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id 
 
     [_threadLocalScope->systraceListener willBuildComponent:componentClass];
 
-    Class<CKComponentScopeFrameProtocol> frameClass = getFrameClass(_threadLocalScope->unifyComponentTreeConfig, componentClass);
-    const auto childPair = [frameClass childPairForPair:_threadLocalScope->stack.top()
-                                                newRoot:_threadLocalScope->newScopeRoot
-                                         componentClass:componentClass
-                                             identifier:identifier
-                                                   keys:_threadLocalScope->keys.top()
-                                    initialStateCreator:initialStateCreator
-                                           stateUpdates:_threadLocalScope->stateUpdates];
+    const auto childPair = [CKScopeTreeNode childPairForPair:_threadLocalScope->stack.top()
+                                                     newRoot:_threadLocalScope->newScopeRoot
+                                              componentClass:componentClass
+                                                  identifier:identifier
+                                                        keys:_threadLocalScope->keys.top()
+                                         initialStateCreator:initialStateCreator
+                                                stateUpdates:_threadLocalScope->stateUpdates];
     _threadLocalScope->stack.push({.frame = childPair.frame, .previousFrame = childPair.previousFrame});
-    _scopeHandle = childPair.frame.handle;
+    _scopeHandle = childPair.frame.scopeHandle;
     _threadLocalScope->keys.push({});
   }
+  CKCAssertWithCategory(_threadLocalScope != nullptr,
+                        NSStringFromClass(componentClass),
+                        @"Component with scope must be created inside component provider function.");
 }
 
 id CKComponentScope::state(void) const noexcept
 {
   return _scopeHandle.state;
+}
+
+CKComponentScopeHandleIdentifier CKComponentScope::identifier(void) const noexcept
+{
+  return _scopeHandle.globalIdentifier;
 }
 
 void CKComponentScope::replaceState(const CKComponentScope &scope, id state)

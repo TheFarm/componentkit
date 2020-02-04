@@ -106,7 +106,7 @@ static void applyChangesToTableView(UITableView *tableView,
 
 #pragma mark - CKDataSourceListener
 
-- (void)componentDataSource:(CKDataSource *)dataSource
+- (void)dataSource:(CKDataSource *)dataSource
      didModifyPreviousState:(CKDataSourceState *)previousState
                   withState:(CKDataSourceState *)state
           byApplyingChanges:(CKDataSourceAppliedChanges *)changes
@@ -139,7 +139,7 @@ static void applyChangesToTableView(UITableView *tableView,
     // Animating the collection view is an expensive operation and should be
     // avoided when possible.
     if (boundsAnimation.duration) {
-      id boundsAnimationContext = CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(_tableView);
+      id boundsAnimationContext = CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(_tableView, heightChange(previousState, state, changes.updatedIndexPaths));
       [UIView performWithoutAnimation:^{
         applyUpdatedState(state);
       }];
@@ -173,8 +173,19 @@ static void applyChangesToTableView(UITableView *tableView,
   }
 }
 
-- (void)componentDataSource:(CKDataSource *)dataSource
- willApplyDeferredChangeset:(CKDataSourceChangeset *)deferredChangeset {}
+static auto heightChange(CKDataSourceState *previousState, CKDataSourceState *state, NSSet *updatedIndexPaths) -> CGFloat
+{
+  auto change = 0.0;
+  for (NSIndexPath *indexPath in updatedIndexPaths) {
+    auto const oldHeight = [previousState objectAtIndexPath:indexPath].rootLayout.size().height;
+    auto const newHeight = [state objectAtIndexPath:indexPath].rootLayout.size().height;
+    change += (newHeight - oldHeight);
+  }
+  return change;
+}
+
+- (void)dataSource:(CKDataSource *)dataSource
+  willApplyDeferredChangeset:(CKDataSourceChangeset *)deferredChangeset {}
 
 - (void)_detachComponentLayoutForRemovedItemsAtIndexPaths:(NSSet *)removedIndexPaths
                                                   inState:(CKDataSourceState *)state
@@ -260,7 +271,7 @@ static NSString *const kReuseIdentifier = @"com.component_kit.table_view_data_so
 {
   CKTableViewDataSourceCell *cell = [_tableView dequeueReusableCellWithIdentifier:kReuseIdentifier forIndexPath:indexPath];
   attachToCell(cell, [_currentState objectAtIndexPath:indexPath], _attachController, _cellToItemMap);
-  cell.rootView.transform = tableView.transform;
+  [cell.rootView setTransform:tableView.transform];
   return cell;
 }
 

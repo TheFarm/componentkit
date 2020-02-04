@@ -62,7 +62,7 @@
 
   // Make sure the cache contains all the components that have component controller.
   for (id child in children) {
-    const CKComponentLayout cacheLayout = layout.cachedLayoutForScopedComponent(child);
+    const CKComponentLayout cacheLayout = layout.cachedLayoutForComponent(child);
     XCTAssertTrue(cacheLayout.component == nil);
   }
 }
@@ -81,7 +81,7 @@
 
   // Make sure the cache contains all the components that have component controller.
   for (id child in children) {
-    const CKComponentLayout cacheLayout = layout.cachedLayoutForScopedComponent(child);
+    const CKComponentLayout cacheLayout = layout.cachedLayoutForComponent(child);
     XCTAssertTrue(cacheLayout.component == child);
   }
 }
@@ -90,8 +90,10 @@
 
 static CKFlexboxComponent* flexboxComponentWithScopedChildren(NSArray<CKComponent *> *children) {
 
-  CKFlexboxComponent *c = [CKFlexboxComponent newWithView:{} size:{} style:{.alignItems = CKFlexboxAlignItemsStart}
-                                                 children:CK::map(children, [](CKComponent *child) -> CKFlexboxComponentChild { return {child}; })];
+  CKFlexboxComponent *c = CK::FlexboxComponentBuilder()
+                              .alignItems(CKFlexboxAlignItemsStart)
+                              .children(CK::map(children, [](CKComponent *child) -> CKFlexboxComponentChild { return {child}; }))
+                              .build();
   return c;
 }
 
@@ -101,62 +103,11 @@ static NSArray<CKComponent *>* createChildrenArray(BOOL scoped) {
     if (scoped) {
       [components addObject:[CKComponentLayoutTestComponent newWithView:{} size:{}]];
     } else {
-      [components addObject:[CKComponent newWithView:{} size:{}]];
+      [components addObject:CK::ComponentBuilder()
+                                .build()];
     }
   }
   return components;
 }
 
-@end
-
-@interface ComponentMatchingPredicate1: CKComponent @end
-@implementation ComponentMatchingPredicate1 @end
-
-@interface ComponentMatchingPredicate2: CKComponent @end
-@implementation ComponentMatchingPredicate2 @end
-
-@interface CKComponentRootLayoutTests: XCTestCase
-@end
-
-const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
-
-@implementation CKComponentRootLayoutTests
-- (void)test_WhenInitialisedWithOnePredicate_ReturnsOnlyMatchingComponents
-{
-  const auto matchingComponent = [ComponentMatchingPredicate1 new];
-  const auto p = CKComponentPredicate {[](const auto c){
-    return [c isKindOfClass:[ComponentMatchingPredicate1 class]];
-  }};
-  const auto l = CKComputeRootComponentLayout([CKCompositeComponent newWithComponent:matchingComponent], sizeRange, nil, CK::none, {p});
-
-  const auto expected = std::vector<CKComponent *> {matchingComponent};
-  XCTAssert(l.componentsMatchingPredicate(p) == expected);
-}
-
-- (void)test_WhenInitialisedWithMultiplePredicates_ReturnsOnlyMatchingComponents
-{
-  const auto matchingComponent = [ComponentMatchingPredicate1 new];
-  const auto p = CKComponentPredicate {[](const auto c){
-    return [c isKindOfClass:[ComponentMatchingPredicate1 class]];
-  }};
-  const auto root = flexboxComponentWithScopedChildren(@[
-                                                         matchingComponent,
-                                                         [ComponentMatchingPredicate2 new],
-                                                         ]);
-  const auto l = CKComputeRootComponentLayout(root, sizeRange, nil, CK::none, {
-    p,
-    CKComponentPredicate {[](const auto c){ return [c isKindOfClass:[ComponentMatchingPredicate2 class]]; }},
-  });
-
-  const auto expected = std::vector<CKComponent *> {matchingComponent};
-  XCTAssert(l.componentsMatchingPredicate(p) == expected);
-}
-
-- (void)test_IgnoresNilComponentsEvenIfTheyMatchPredicate
-{
-  const auto p = CKComponentPredicate {[](const auto c){ return YES; }};
-  const auto l = CKComputeRootComponentLayout([CKCompositeComponent newWithComponent:nil], sizeRange, nil, CK::none, {p});
-
-  XCTAssert(l.componentsMatchingPredicate(p) == std::vector<CKComponent *> {});
-}
 @end

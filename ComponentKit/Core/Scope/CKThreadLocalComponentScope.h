@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <stack>
 #import <vector>
 
@@ -26,8 +30,7 @@ class CKThreadLocalComponentScope {
 public:
   CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                               const CKComponentStateUpdateMap &updates,
-                              CKUnifyComponentTreeConfig unifyComponentTreeConfig = {},
-                              BuildTrigger trigger = BuildTrigger::NewTree);
+                              CKBuildTrigger trigger = CKBuildTrigger::NewTree);
   ~CKThreadLocalComponentScope();
 
   /** Returns nullptr if there isn't a current scope */
@@ -46,16 +49,15 @@ public:
 
   /** The current systrace listener. Can be nil if systrace is not enabled. */
   id<CKSystraceListener> systraceListener;
-  
+
   /** Build trigger of the corsposnding component creation */
-  BuildTrigger buildTrigger;
+  CKBuildTrigger buildTrigger;
 
   /** Component Allocations */
   NSUInteger componentAllocations;
 
-  /** Merge Tree Nodes and Scope Frames */
-  CKUnifyComponentTreeConfig unifyComponentTreeConfig;
-
 private:
   CKThreadLocalComponentScope *const previousScope;
 };
+
+#endif

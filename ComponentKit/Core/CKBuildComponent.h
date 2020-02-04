@@ -8,23 +8,17 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
+#import <ComponentKit/CKBuildComponentResult.h>
 #import <ComponentKit/CKComponentScopeTypes.h>
-#import <ComponentKit/CKComponentBoundsAnimation.h>
-#import <ComponentKit/CKGlobalConfig.h>
 
 @class CKComponentScopeRoot;
 @class CKComponent;
-
-struct CKBuildComponentTreeParams;
-
-// Collection of events that trigger a new component generation.
-enum class BuildTrigger {
-  NewTree,
-  StateUpdate,
-  PropsUpdate,
-};
 
 namespace CKBuildComponentHelpers {
   /**
@@ -32,21 +26,8 @@ namespace CKBuildComponentHelpers {
 
    @return The related build trigger given the in input parameters
    */
-  auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> BuildTrigger;
+  auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> CKBuildTrigger;
 }
-
-/**
- The results of a build operation.
-
- A bounds animations are returned in this method if a component in the hierarchy requested an animation from its prior
- state. These animations should be applied with CKComponentBoundsAnimationApply.
- */
-struct CKBuildComponentResult {
-  CKComponent *component;
-  CKComponentScopeRoot *scopeRoot;
-  CKComponentBoundsAnimation boundsAnimation;
-  BuildTrigger buildTrigger;
-};
 
 /**
  Used to construct a component hierarchy. This is necessary to configure the thread-local state so that components
@@ -55,11 +36,11 @@ struct CKBuildComponentResult {
  @param previousRoot The previous scope root that was associated with the cell. May be nil if no prior root is available
  @param stateUpdates A map of state updates that have accumulated since the last component generation was constructed.
  @param componentFactory A block that constructs your component. Must not be nil.
- @param ignoreComponentReuseOptimizations When enabled, all the comopnents will be regenerated (no component reuse optimiztions).
- @param unifyComponentTreeConfig Tree unification config.
+ @param enableComponentReuseOptimizations If `NO`, all the comopnents will be regenerated (no component reuse optimiztions). `YES` by default.
  */
 CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
                                         const CKComponentStateUpdateMap &stateUpdates,
                                         CKComponent *(^componentFactory)(void),
-                                        BOOL ignoreComponentReuseOptimizations = NO,
-                                        CKUnifyComponentTreeConfig unifyComponentTreeConfig = CKReadGlobalConfig().unifyComponentTreeConfig);
+                                        BOOL enableComponentReuseOptimizations = YES);
+
+#endif

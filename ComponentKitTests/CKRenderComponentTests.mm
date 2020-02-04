@@ -16,15 +16,15 @@
 #import <ComponentKit/CKFlexboxComponent.h>
 #import <ComponentKit/CKThreadLocalComponentScope.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
+#import <ComponentKit/CKComponentScopeRoot.h>
+#import <ComponentKit/CKRenderHelpers.h>
 
 #import <ComponentKitTestHelpers/CKRenderComponentTestHelpers.h>
 
-#import "CKTreeNodeWithChild.h"
-#import "CKTreeNodeWithChildren.h"
-#import "CKRenderHelpers.h"
-#import "CKScopeTreeNode.h"
-
 @interface CKRenderComponentTests : XCTestCase
+@end
+
+@interface CKRenderComponentAndScopeTreeTests : XCTestCase
 @end
 
 @implementation CKRenderComponentTests
@@ -43,7 +43,7 @@
 - (void)setUpForFasterStateUpdates:(CKComponent *(^)(void))componentFactory
 {
   // New Tree Creation.
-  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory);
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
 
   _c = (CKTestRenderComponent *)buildResults.component;
   _scopeRoot = buildResults.scopeRoot;
@@ -53,7 +53,7 @@
 - (void)setUpForFasterPropsUpdates:(CKComponent *(^)(void))componentFactory
 {
   // New Tree Creation.
-  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory);
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
   _c = (CKTestRenderComponent *)buildResults.component;
   _scopeRoot = buildResults.scopeRoot;
   XCTAssertEqual(_c.renderCalledCounter, 1);
@@ -72,16 +72,13 @@
   auto const c2 = [CKTestRenderComponent new];
   CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {100, 101}, // Use a random id that represents a fake state update on a different branch.
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = {},
+    .treeNodeDirtyIds = {100, 101}, // Use a random id that represents a fake state update on a different branch.
+    .buildTrigger = CKBuildTrigger::StateUpdate,
+  });
 
   // As the state update doesn't affect the c2, we should reuse c instead.
   [self verifyComponentIsBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -89,28 +86,38 @@
 
 - (void)test_fasterStateUpdate_componentIsNotBeingReused_onStateUpdateOnAParent
 {
-  [self setUpForFasterStateUpdates];
+  __block CKCompositeComponentWithScopeAndState *root;
+  __block CKTestRenderComponent *c;
+  auto const componentFactory = ^{
+    c = [CKTestRenderComponent newWithProps:{.identifier = 1}];
+    root = [CKCompositeComponentWithScopeAndState newWithComponent:c];
+    return root;
+  };
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
 
   // Simulate a state update on a parent component:
   // 1. parentHasStateUpdate = YES
   // 2. treeNodeDirtyIds with a fake parent id.
-  CKThreadLocalComponentScope threadScope(_scopeRoot, {});
-  CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[root.scopeHandle].push_back(^(id){
+    return @2;
+  });
 
-  auto const c2 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {100}, // Use a random id that represents a state update on a fake parent.
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:YES];
+  __block CKCompositeComponentWithScopeAndState *root2;
+  __block CKTestRenderComponent *c2;
+  auto const componentFactory2 = ^{
+    c2 = [CKTestRenderComponent newWithProps:{.identifier = 2}];
+    root2 = [CKCompositeComponentWithScopeAndState newWithComponent:c2];
+    return root2;
+  };
 
-  // As the state update affect c2, we should recreate its children.
-  [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES);
+
+  // c has dirty parent, however, the components are equal, so we reuse the previous component.
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 1);
+  XCTAssertFalse(c2.didReuseComponent);
+  XCTAssertNotEqual(c.childComponent, c2.childComponent);
   // Make sure the dirtyParent is pssed correctly to the child component.
   XCTAssertTrue(c2.childComponent.parentHasStateUpdate);
 }
@@ -129,18 +136,15 @@
   stateUpdates[_c.scopeHandle] = {^id(id s) { return s; }};
 
   auto const c2 = [CKTestRenderComponent new];
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = stateUpdates,
-                    .treeNodeDirtyIds = {
-                      _c.scopeHandle.treeNodeIdentifier
-                    },
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = stateUpdates,
+    .treeNodeDirtyIds = {
+      _c.scopeHandle.treeNodeIdentifier
+    },
+    .buildTrigger = CKBuildTrigger::StateUpdate,
+  });
 
   // As the state update affect c2, we should recreate its children.
   [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -164,18 +168,15 @@
 
   auto const c2 = [CKTestRenderComponent new];
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = stateUpdates,
-                    .treeNodeDirtyIds = {
-                      _c.scopeHandle.treeNodeIdentifier
-                    },
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = stateUpdates,
+    .treeNodeDirtyIds = {
+      _c.scopeHandle.treeNodeIdentifier
+    },
+    .buildTrigger = CKBuildTrigger::StateUpdate,
+  });
 
   // As the state update affect c2, we should recreate its children.
   [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -196,16 +197,13 @@
   auto const c2 = [CKTestRenderComponent newWithProps:{.identifier = 2}];
   CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {},
-                    .buildTrigger = BuildTrigger::PropsUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = {},
+    .treeNodeDirtyIds = {},
+    .buildTrigger = CKBuildTrigger::PropsUpdate,
+  });
 
   // Props are not equal, we cannot reuse the component in this case.
   [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -227,16 +225,13 @@
   auto const c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
   CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {},
-                    .buildTrigger = BuildTrigger::PropsUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = {},
+    .treeNodeDirtyIds = {},
+    .buildTrigger = CKBuildTrigger::PropsUpdate,
+  });
 
   // The components are equal, we can reuse the previous component.
   [self verifyComponentIsBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -246,31 +241,39 @@
 
 - (void)test_fasterPropsUpdate_componentIsBeingReused_onStateUpdateWithDirtyParentAndEqualComponents
 {
+  __block CKCompositeComponentWithScopeAndState *root;
+  __block CKTestRenderComponent *c;
   auto const componentIdentifier = 1;
-  [self setUpForFasterPropsUpdates:^{
-    return [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
-  }];
+  auto const componentFactory = ^{
+    c = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
+    root = [CKCompositeComponentWithScopeAndState newWithComponent:c];
+    return root;
+  };
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
 
   // Simulate a state update on a parent component:
   // 1. parentHasStateUpdate = YES
   // 2. treeNodeDirtyIds with a fake parent id.
-  CKThreadLocalComponentScope threadScope(_scopeRoot, {});
-  auto const c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
-  CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[root.scopeHandle].push_back(^(id){
+    return @2;
+  });
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {100}, // Use a random id that represents a state update on a fake parent.
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:YES];
+  __block CKCompositeComponentWithScopeAndState *root2;
+  __block CKTestRenderComponent *c2;
+  auto const componentFactory2 = ^{
+    c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
+    root2 = [CKCompositeComponentWithScopeAndState newWithComponent:c2];
+    return root2;
+  };
+
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES);
 
   // c has dirty parent, however, the components are equal, so we reuse the previous component.
-  [self verifyComponentIsBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 0);
+  XCTAssertTrue(c2.didReuseComponent);
+  XCTAssertEqual(c.childComponent, c2.childComponent);
 }
 
 - (void)test_fasterPropsUpdate_componentIsBeingReused_onStateUpdateWithNonDirtyComponentAndEqualComponents
@@ -287,16 +290,13 @@
   auto const c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
   CKComponentScopeRoot *scopeRoot2 = threadScope.newScopeRoot;
 
-  [c2 buildComponentTree:scopeRoot2.rootNode.node()
-          previousParent:_scopeRoot.rootNode.node()
-                  params:{
-                    .scopeRoot = scopeRoot2,
-                    .previousScopeRoot = _scopeRoot,
-                    .stateUpdates = {},
-                    .treeNodeDirtyIds = {},
-                    .buildTrigger = BuildTrigger::StateUpdate,
-                  }
-    parentHasStateUpdate:NO];
+  CKRender::ComponentTree::Root::build(c2, {
+    .scopeRoot = scopeRoot2,
+    .previousScopeRoot = _scopeRoot,
+    .stateUpdates = {},
+    .treeNodeDirtyIds = {},
+    .buildTrigger = CKBuildTrigger::StateUpdate,
+  });
 
   // c is not dirty, the components are equal, so we reuse the previous component.
   [self verifyComponentIsBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:scopeRoot2];
@@ -325,7 +325,7 @@
     return c2;
   };
 
-  auto const buildResults = CKBuildComponent(_scopeRoot, {}, componentFactory);
+  auto const buildResults = CKBuildComponent(_scopeRoot, {}, componentFactory, YES);
 
   // The components are equal, but the node id is dirty - hence, we cannot reuse the previous component.
   [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:buildResults.scopeRoot];
@@ -346,7 +346,7 @@
     return rootComponent;
   };
 
-  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory);
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
   XCTAssertFalse(c.childComponent.parentHasStateUpdate);
 
   // Simulate a state update on the root.
@@ -365,7 +365,7 @@
     return rootComponent2;
   };
 
-  CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2);
+  CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES);
   XCTAssertTrue(c2.childComponent.parentHasStateUpdate);
 }
 
@@ -377,14 +377,19 @@
   auto const componentFactory = ^{
     c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
     c2 = [CKTestRenderComponent newWithProps:{.identifier = 2}];
-    return [CKTestRenderWithChildrenComponent newWithChildren:{c1, c2}];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
   };
 
   // Build scope root with predicates.
-  auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil, {&CKComponentRenderTestsPredicate}, {&CKComponentControllerRenderTestsPredicate});
-  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory);
+  auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil,
+                                                            {&CKComponentRenderTestsPredicate},
+                                                            {&CKComponentControllerRenderTestsPredicate});
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
   // Verify components and controllers registration in the scope root.
-  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults.scopeRoot components:{c1.childComponent, c2.childComponent}];
+  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults.scopeRoot
+                                                    components:{c1.childComponent, c2.childComponent}
+                                            componentPredicate:&CKComponentRenderTestsPredicate
+                                  componentControllerPredicate:&CKComponentControllerRenderTestsPredicate];
 
   // Simulate a state update on c2.
   CKComponentStateUpdateMap stateUpdates;
@@ -392,14 +397,62 @@
     return @2;
   });
 
-  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory);
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, YES);
   // Verify c1 has been reused
   XCTAssertTrue(c1.didReuseComponent);
   // Verify components and controllers registration in the scope root.
-  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults2.scopeRoot components:{c1.childComponent, c2.childComponent}];
+  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults2.scopeRoot
+                                                    components:{c1.childComponent,c2.childComponent}
+                                            componentPredicate:&CKComponentRenderTestsPredicate
+                                  componentControllerPredicate:&CKComponentControllerRenderTestsPredicate];
 }
 
-- (void)test_componentIsNotBeingReusedOnAStateUpdate_WhenIgnoreComponentReuseOptimizationsIsOn
+- (void)test_registerComponentsAndControllersInScopeRootAfterReuseWithNonRenderComponents
+{
+  // Build new tree with siblings `CKTestRenderComponent` components.
+  __block CKTestRenderComponent *c1;
+  __block CKTestRenderComponent *c2;
+  auto const componentFactory = ^{
+    c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
+    c2 = [CKTestRenderComponent newWithProps:{.identifier = 2, .shouldUseNonRenderChild = YES}];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
+  };
+
+  // Build scope root with predicates.
+  auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil,
+  {&CKAllNonNilComponentsTestsPredicate},
+  {&CKAllNonNilComponentsControllersTestsPredicate});
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
+  // Verify components and controllers registration in the scope root.
+  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults.scopeRoot
+                                                    components:{
+    c1, c1.childComponent,
+    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.child,
+  }
+                                            componentPredicate:&CKAllNonNilComponentsTestsPredicate
+                                  componentControllerPredicate:&CKAllNonNilComponentsControllersTestsPredicate];
+
+  // Simulate a state update on c1.
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[c1.scopeHandle].push_back(^(id){
+    return @2;
+  });
+
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, YES);
+  // Verify c1 has been reused
+  XCTAssertTrue(c2.didReuseComponent);
+
+  // Verify components and controllers registration in the scope root.
+  [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults2.scopeRoot
+                                                    components:{
+    c1, c1.childComponent,
+    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.child,
+  }
+                                            componentPredicate:&CKAllNonNilComponentsTestsPredicate
+                                  componentControllerPredicate:&CKAllNonNilComponentsControllersTestsPredicate];
+}
+
+- (void)test_componentIsNotBeingReusedOnAStateUpdate_WhenEnableComponentReuseOptimizationsIsOff
 {
   // Build new tree with siblings `CKTestRenderComponent` components.
   __block CKTestRenderComponent *c1;
@@ -407,12 +460,12 @@
   auto const componentFactory = ^{
     c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
     c2 = [CKTestRenderComponent newWithProps:{.identifier = 2}];
-    return [CKTestRenderWithChildrenComponent newWithChildren:{c1, c2}];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
   };
 
   // Build scope root with predicates.
   auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory);
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
 
   // Simulate a state update on c2.
   CKComponentStateUpdateMap stateUpdates;
@@ -420,14 +473,14 @@
     return @2;
   });
 
-  auto ignoreComponentReuseOptimizationsIsOn = YES;
-  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, ignoreComponentReuseOptimizationsIsOn);
+  auto enableComponentReuseOptimizations = NO;
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, enableComponentReuseOptimizations);
   // Verify no component have been reused.
   XCTAssertFalse(c1.didReuseComponent);
   XCTAssertFalse(c2.didReuseComponent);
 }
 
-- (void)test_componentIsNotBeingReusedOnAPropsUpdate_WhenIgnoreComponentReuseOptimizationsIsOn
+- (void)test_componentIsNotBeingReusedOnAPropsUpdate_WhenEnableComponentReuseOptimizationsIsOff
 {
   // Build new tree with siblings `CKTestRenderComponent` components.
   __block CKTestRenderComponent *c1;
@@ -435,174 +488,107 @@
   auto const componentFactory = ^{
     c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
     c2 = [CKTestRenderComponent newWithProps:{.identifier = 2}];
-    return [CKTestRenderWithChildrenComponent newWithChildren:{c1, c2}];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
   };
 
   // Build scope root with predicates.
   auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory);
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
 
-  auto ignoreComponentReuseOptimizationsIsOn = YES;
-  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, {}, componentFactory, ignoreComponentReuseOptimizationsIsOn);
+  auto enableComponentReuseOptimizations = NO;
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, {}, componentFactory, enableComponentReuseOptimizations);
   // Verify no component have been reused.
   XCTAssertFalse(c1.didReuseComponent);
   XCTAssertFalse(c2.didReuseComponent);
 }
 
-- (void)test_layoutIsNotBeingReusedOnComponentReuse_WhenLayoutCacheIsOff
-{
-  auto const enableLayoutCache = NO;
-  CKSizeRange sizeRange = {{100,100}, {100,100}};
+#pragma mark - Helpers
 
-  // Simulate build component
-  CKTestRenderComponent *c1;
-  auto previousRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::NewTree, c1, enableLayoutCache);
-    CKComputeRootComponentLayout(c1, sizeRange).layout();
-  }
-
-  // Simulate Props Updates
-  CKTestRenderComponent *c2;
-  previousRoot = scopeRoot;
-  scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c2 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::PropsUpdate, c2, enableLayoutCache);
-    CKComputeRootComponentLayout(c2, sizeRange);
-  }
-
-  // Verify there was a component reuse;
-  XCTAssertEqual(c1.childComponent, c2.childComponent);
-  XCTAssertTrue(c2.didReuseComponent);
-  // No layout cache, which means we computed layout for the child component twice.
-  XCTAssertEqual(c1.childComponent.computeCalledCounter, 2);
+// Filters `CKTestChildRenderComponent` components.
+static BOOL CKComponentRenderTestsPredicate(id<CKComponentProtocol> component) {
+  return [component class] == [CKTestChildRenderComponent class];
 }
 
-- (void)test_layoutIsBeingReusedOnComponentReuse_WhenLayoutCacheIsOn
-{
-  auto const enableLayoutCache = YES;
-  CKSizeRange sizeRange = {{100,100}, {100,100}};
-
-  // Simulate build component
-  CKTestRenderComponent *c1;
-  auto previousRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::NewTree, c1, enableLayoutCache);
-    CKComputeRootComponentLayout(c1, sizeRange).layout();
-  }
-
-  // Simulate Props Updates
-  CKTestRenderComponent *c2;
-  previousRoot = scopeRoot;
-  scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c2 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::PropsUpdate, c2, enableLayoutCache);
-    CKComputeRootComponentLayout(c2, sizeRange);
-  }
-
-  // Verify there was a component reuse;
-  XCTAssertEqual(c1.childComponent, c2.childComponent);
-  XCTAssertTrue(c2.didReuseComponent);
-  // Layout cache is on, we should compute the layout for the reused component once.
-  XCTAssertEqual(c1.childComponent.computeCalledCounter, 1);
+// Filters `CKTestChildRenderComponentController` controllers.
+static BOOL CKComponentControllerRenderTestsPredicate(id<CKComponentControllerProtocol> controller) {
+  return [controller class] == [CKTestChildRenderComponentController class];
 }
 
-- (void)test_layoutIsNotBeingReusedOnComponentReuse_WhenLayoutCacheIsOnButSizeRangeIsDifferent
-{
-  auto const enableLayoutCache = YES;
-  CKSizeRange sizeRange1 = {{100,100}, {100,100}};
-  CKSizeRange sizeRange2 = {{200,200}, {200,200}};
-
-  // Simulate build component
-  CKTestRenderComponent *c1;
-  auto previousRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c1 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::NewTree, c1, enableLayoutCache);
-    CKComputeRootComponentLayout(c1, sizeRange1).layout();
-  }
-
-  // Simulate Props Updates
-  CKTestRenderComponent *c2;
-  previousRoot = scopeRoot;
-  scopeRoot = previousRoot.newRoot;
-  {
-    CKThreadLocalComponentScope threadScope(scopeRoot, {});
-    c2 = [CKTestRenderComponent newWithProps:{.identifier = 1}];
-    SimulateBuildComponentTree(scopeRoot, previousRoot, BuildTrigger::PropsUpdate, c2, enableLayoutCache);
-    CKComputeRootComponentLayout(c2, sizeRange2);
-  }
-
-  // Verify there was a component reuse;
-  XCTAssertEqual(c1.childComponent, c2.childComponent);
-  XCTAssertTrue(c2.didReuseComponent);
-  // Layout cache is on, but the size constraint is different - we should compute the layout for the reused component twice.
-  XCTAssertEqual(c1.childComponent.computeCalledCounter, 2);
+// Filters all non-nil components.
+static BOOL CKAllNonNilComponentsTestsPredicate(id<CKComponentProtocol> component) {
+  return component != nil;
 }
+
+// Filters all non-nil controllers.
+static BOOL CKAllNonNilComponentsControllersTestsPredicate(id<CKComponentControllerProtocol> controller) {
+  return controller != nil;
+}
+
+- (void)verifyComponentIsNotBeingReused:(CKTestRenderComponent *)c
+                                     c2:(CKTestRenderComponent *)c2
+                              scopeRoot:(CKComponentScopeRoot *)scopeRoot
+                             scopeRoot2:(CKComponentScopeRoot *)scopeRoot2
+{
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 1);
+  XCTAssertFalse(c2.didReuseComponent);
+  XCTAssertNotEqual(c.childComponent, c2.childComponent);
+}
+
+- (void)verifyComponentIsBeingReused:(CKTestRenderComponent *)c
+                                  c2:(CKTestRenderComponent *)c2
+                           scopeRoot:(CKComponentScopeRoot *)scopeRoot
+                          scopeRoot2:(CKComponentScopeRoot *)scopeRoot2
+{
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 0);
+  XCTAssertTrue(c2.didReuseComponent);
+  XCTAssertEqual(c.childComponent, c2.childComponent);
+}
+
+- (void)verifyComponentsAndControllersAreRegisteredInScopeRoot:(CKComponentScopeRoot *)scopeRoot
+                                                    components:(std::vector<CKComponent *>)components
+                                            componentPredicate:(CKComponentPredicate)componentPredicate
+                                  componentControllerPredicate:(CKComponentControllerPredicate)componentControllerPredicate
+{
+  auto const registeredComponents = [scopeRoot componentsMatchingPredicate:componentPredicate];
+  auto const registeredControllers = [scopeRoot componentControllersMatchingPredicate:componentControllerPredicate];
+  for (auto const &c: components) {
+    XCTAssertNotNil(c, @"component shoudn't be nil here");
+    XCTAssertTrue(CK::Collection::contains(registeredComponents, c));
+    if (c.controller) {
+      XCTAssertTrue(CK::Collection::contains(registeredControllers, c.controller));
+    }
+  }
+}
+
+static CKCompositeComponentWithScopeAndState* generateComponentHierarchyWithComponent(CKComponent *c) {
+  return
+  [CKCompositeComponentWithScopeAndState
+   newWithComponent:
+   CK::FlexboxComponentBuilder()
+       .child(c)
+       .build()];
+}
+
+@end
+
+
+@implementation CKRenderComponentAndScopeTreeTests
 
 - (void)test_scopeFramePreserveStateDuringComponentReuse
 {
   // CKComponentScopeFrame
-  [self __test_scopeFramePreserveStateDuringComponentReuse:{
-    .enable = NO,
-    .useRenderNodes = NO,
-    .useSingleChildScopeNodeForCompositeComponent = NO,
-  }];
+  [self __test_scopeFramePreserveStateDuringComponentReuse];
 }
 
-- (void)test_scopeTreeNodePreserveStateDuringComponentReuse
+- (void)test_renderComponentPreserveStateDuringComponentReuse
 {
-  // CKComponentScopeTreeNode
-  [self __test_scopeFramePreserveStateDuringComponentReuse:{
-    .enable = YES,
-    .useRenderNodes = NO,
-    .useSingleChildScopeNodeForCompositeComponent = NO,
-  }];
+  // CKComponentScopeFrame
+  [self __test_renderComponentPreserveStateDuringComponentReuse];
 }
 
-- (void)test_scopeTreeNodePreserveStateDuringComponentReuseWithRenderNode
-{
-  // CKComponentScopeTreeNode & CKRenderTreeNode
-  [self __test_scopeFramePreserveStateDuringComponentReuse:{
-    .enable = YES,
-    .useRenderNodes = YES,
-    .useSingleChildScopeNodeForCompositeComponent = NO,
-  }];
-}
-
-- (void)test_scopeTreeNodePreserveStateDuringComponentReuseWithScopeTreeNodeWithChild
-{
-  // CKComponentScopeTreeNode & CKComponentScopeTreeNodeWithChild
-  [self __test_scopeFramePreserveStateDuringComponentReuse:{
-    .enable = YES,
-    .useRenderNodes = NO,
-    .useSingleChildScopeNodeForCompositeComponent = YES,
-  }];
-}
-
-- (void)test_scopeTreeNodePreserveStateDuringComponentReuseWithRenderNodeAndScopeTreeNodeWithChild
-{
-  // CKComponentScopeTreeNode & CKRenderTreeNode & CKComponentScopeTreeNodeWithChild
-  [self __test_scopeFramePreserveStateDuringComponentReuse:{
-    .enable = YES,
-    .useRenderNodes = YES,
-    .useSingleChildScopeNodeForCompositeComponent = YES,
-  }];
-}
-
-- (void)__test_scopeFramePreserveStateDuringComponentReuse:(CKUnifyComponentTreeConfig)config
+- (void)__test_scopeFramePreserveStateDuringComponentReuse
 {
   // Build new tree with siblings `CKTestRenderWithNonRenderWithStateChildComponent` components.
   // Each `CKTestRenderWithNonRenderWithStateChildComponent` has non-render component with state.
@@ -611,18 +597,18 @@
   auto const componentFactory = ^{
     c1 = [CKTestRenderWithNonRenderWithStateChildComponent new];
     c2 = [CKTestRenderWithNonRenderWithStateChildComponent new];
-    return [CKTestRenderWithChildrenComponent newWithChildren:{c1, c2}];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
   };
 
   // Build first component generation:
   auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
-  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, NO, config);
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
 
   // Simulate state update on c1.childComponent
   NSNumber *newState1 = @10;
   CKComponentStateUpdateMap stateUpdates;
   stateUpdates[c1.childComponent.scopeHandle].push_back(^(id){ return newState1; });
-  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, NO, config);
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, YES);
   // Verify `c2.childComponent` gets the correct new state
   XCTAssertEqual(newState1, c1.childComponent.scopeHandle.state);
   // Verify c2 was reused
@@ -635,7 +621,7 @@
   CKComponentStateUpdateMap stateUpdates2;
   stateUpdates2[c2.childComponent.scopeHandle].push_back(^(id){ return newState2;});
 
-  auto const buildResults3 = CKBuildComponent(buildResults2.scopeRoot, stateUpdates2, componentFactory, NO, config);
+  auto const buildResults3 = CKBuildComponent(buildResults2.scopeRoot, stateUpdates2, componentFactory, YES);
   // Verify `c2.childComponent` gets the correct new state
   XCTAssertEqual(newState2, c2.childComponent.scopeHandle.state);
   // Verify c1 was reused
@@ -650,7 +636,7 @@
   CKComponentStateUpdateMap stateUpdates3;
   stateUpdates3[c1.childComponent.scopeHandle].push_back(^(id){ return newState3;});
 
-  auto const buildResults4 = CKBuildComponent(buildResults3.scopeRoot, stateUpdates3, componentFactory, NO, config);
+  auto const buildResults4 = CKBuildComponent(buildResults3.scopeRoot, stateUpdates3, componentFactory, YES);
   // Verify `c1.childComponent` gets the correct new state
   XCTAssertEqual(newState3, c1.childComponent.scopeHandle.state);
   // Verify c2 was reused
@@ -661,89 +647,64 @@
   XCTAssertEqual(newState2, c2.childComponent.scopeHandle.state);
 }
 
-#pragma mark - Helpers
-
-// Filters `CKTestChildRenderComponent` components.
-static BOOL CKComponentRenderTestsPredicate(id<CKComponentProtocol> controller) {
-  return [controller class] == [CKTestChildRenderComponent class];
-}
-
-// Filters `CKTestChildRenderComponentController` controllers.
-static BOOL CKComponentControllerRenderTestsPredicate(id<CKComponentControllerProtocol> controller) {
-  return [controller class] == [CKTestChildRenderComponentController class];
-}
-
-- (void)verifyComponentIsNotBeingReused:(CKTestRenderComponent *)c
-                                     c2:(CKTestRenderComponent *)c2
-                              scopeRoot:(CKComponentScopeRoot *)scopeRoot
-                             scopeRoot2:(CKComponentScopeRoot *)scopeRoot2
+- (void)__test_renderComponentPreserveStateDuringComponentReuse
 {
-  CKTreeNodeWithChild *childNode = (CKTreeNodeWithChild *)scopeRoot.rootNode.node().children[0];
-  CKTreeNodeWithChild *childNode2 = (CKTreeNodeWithChild *)scopeRoot2.rootNode.node().children[0];
-  XCTAssertEqual(c.renderCalledCounter, 1);
-  XCTAssertEqual(c2.renderCalledCounter, 1);
-  XCTAssertFalse(c2.didReuseComponent);
-  XCTAssertNotEqual(c.childComponent, c2.childComponent);
-  XCTAssertNotEqual(childNode.child, childNode2.child);
-}
-
-- (void)verifyComponentIsBeingReused:(CKTestRenderComponent *)c
-                                  c2:(CKTestRenderComponent *)c2
-                           scopeRoot:(CKComponentScopeRoot *)scopeRoot
-                          scopeRoot2:(CKComponentScopeRoot *)scopeRoot2
-{
-  CKTreeNodeWithChild *childNode = (CKTreeNodeWithChild *)scopeRoot.rootNode.node().children[0];
-  CKTreeNodeWithChild *childNode2 = (CKTreeNodeWithChild *)scopeRoot2.rootNode.node().children[0];
-  XCTAssertEqual(c.renderCalledCounter, 1);
-  XCTAssertEqual(c2.renderCalledCounter, 0);
-  XCTAssertTrue(c2.didReuseComponent);
-  XCTAssertEqual(c.childComponent, c2.childComponent);
-  XCTAssertEqual(childNode.child, childNode2.child);
-}
-
-- (void)verifyComponentsAndControllersAreRegisteredInScopeRoot:(CKComponentScopeRoot *)scopeRoot
-                                                    components:(std::vector<CKComponent *>)components
-{
-  auto const registeredComponents = [scopeRoot componentsMatchingPredicate:&CKComponentRenderTestsPredicate];
-  auto const registeredControllers = [scopeRoot componentControllersMatchingPredicate:&CKComponentControllerRenderTestsPredicate];
-  for (auto const &c: components) {
-    XCTAssertTrue(CK::Collection::contains(registeredComponents, c));
-    XCTAssertTrue(CK::Collection::contains(registeredControllers, c.scopeHandle.controller));
-  }
-}
-
-static CKCompositeComponentWithScopeAndState* generateComponentHierarchyWithComponent(CKComponent *c) {
-  return
-  [CKCompositeComponentWithScopeAndState
-   newWithComponent:
-   [CKFlexboxComponent
-    newWithView:{}
-    size:{}
-    style:{}
-    children:{
-      { c }
-    }]];
-}
-
-static void SimulateBuildComponentTree(CKComponentScopeRoot *scopeRoot,
-                                       CKComponentScopeRoot *previousScopeRoot,
-                                       BuildTrigger buildTrigger,
-                                       CKComponent *component,
-                                       BOOL enableLayoutCache) {
-  CKBuildComponentTreeParams params = {
-    .scopeRoot = scopeRoot,
-    .previousScopeRoot = previousScopeRoot,
-    .stateUpdates = {},
-    .treeNodeDirtyIds = CKRender::treeNodeDirtyIdsFor(previousScopeRoot, {}, buildTrigger),
-    .buildTrigger = buildTrigger,
-    .enableLayoutCache = enableLayoutCache,
+  // Build new tree with siblings `CKTestRenderWithNonRenderWithStateChildComponent` components.
+  // Each `CKTestRenderWithNonRenderWithStateChildComponent` has non-render component with state.
+  __block CKTestRenderWithNonRenderWithStateChildComponent *c1;
+  __block CKTestRenderWithNonRenderWithStateChildComponent *c2;
+  auto const componentFactory = ^{
+    c1 = [CKTestRenderWithNonRenderWithStateChildComponent new];
+    c2 = [CKTestRenderWithNonRenderWithStateChildComponent new];
+    return [CKTestLayoutComponent newWithChildren:{c1, c2}];
   };
 
-  // Build the component tree from the render function.
-  [component buildComponentTree:scopeRoot.rootNode.node()
-                 previousParent:previousScopeRoot.rootNode.node()
-                         params:params
-           parentHasStateUpdate:NO];
+  // Build first component generation:
+  auto const scopeRoot = CKComponentScopeRootWithPredicates(nil, nil, {}, {});
+  auto const buildResults = CKBuildComponent(scopeRoot, {}, componentFactory, YES);
+
+  // Simulate state update on c1
+  NSNumber *newState1 = @10;
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[c1.scopeHandle].push_back(^(id){ return newState1; });
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory, YES);
+  // Verify `c2.childComponent` gets the correct new state
+  XCTAssertEqual(newState1, c1.scopeHandle.state);
+  // Verify c2 was reused
+  XCTAssertTrue(c2.didReuseComponent);
+  // Verify c1 wasn't reused
+  XCTAssertFalse(c1.didReuseComponent);
+
+  // Simulate state update on c2
+  NSNumber *newState2 = @20;
+  CKComponentStateUpdateMap stateUpdates2;
+  stateUpdates2[c2.scopeHandle].push_back(^(id){ return newState2;});
+
+  auto const buildResults3 = CKBuildComponent(buildResults2.scopeRoot, stateUpdates2, componentFactory, YES);
+  // Verify `c2.childComponent` gets the correct new state
+  XCTAssertEqual(newState2, c2.scopeHandle.state);
+  // Verify c1 was reused
+  XCTAssertTrue(c1.didReuseComponent);
+  // Verify c2 wasn't reused
+  XCTAssertFalse(c2.didReuseComponent);
+  // Verify `c1.childComponent` preserves its state during component reuse
+  XCTAssertEqual(newState1, c1.scopeHandle.state);
+
+  // Simulate state update on c1
+  NSNumber *newState3 = @30;
+  CKComponentStateUpdateMap stateUpdates3;
+  stateUpdates3[c1.scopeHandle].push_back(^(id){ return newState3;});
+
+  auto const buildResults4 = CKBuildComponent(buildResults3.scopeRoot, stateUpdates3, componentFactory, YES);
+  // Verify `c1.childComponent` gets the correct new state
+  XCTAssertEqual(newState3, c1.scopeHandle.state);
+  // Verify c2 was reused
+  XCTAssertTrue(c2.didReuseComponent);
+  // Verify c1 wasn't reused
+  XCTAssertFalse(c1.didReuseComponent);
+  // Verify `c2.childComponent` preserves its state during component reuse
+  XCTAssertEqual(newState2, c2.scopeHandle.state);
 }
+
 
 @end

@@ -8,13 +8,19 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <ComponentKit/CKTreeNodeProtocol.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /**
- This protocol is being implemented by the components that has a render method: `CKRenderComponent` and `CKRenderWithChildrenComponent`.
+ This protocol is being implemented by the components that has a render method: `CKRenderComponent`.
 
  Please DO NOT implement a new component that conforms to this protocol;
- your component should subclass either from `CKRenderComponent` or `CKRenderWithChildrenComponent`.
+ your component should subclass either from `CKRenderComponent`.
  */
 @protocol CKRenderComponentProtocol <CKTreeNodeComponentProtocol>
 
@@ -22,7 +28,7 @@
  Override this method in order to provide an initialState which depends on the component's props.
  Otherwise, override `+(id)initialState` instead.
  */
-+ (id)initialStateWithComponent:(id<CKRenderComponentProtocol>)component;
++ (id _Nullable)initialStateWithComponent:(id<CKRenderComponentProtocol>)component;
 
 /*
  Override this method in order to allow ComopnentKit to reuse the previous components.
@@ -62,7 +68,10 @@
 
  In this case, the infrastrcture cannot distinguish between B1 and B2, unless it provides a unqiue identifier.
  */
-- (id<NSObject>)componentIdentifier;
+- (id<NSObject> _Nullable)componentIdentifier;
+
+/** Returns true if the component requires scope handle */
++ (BOOL)requiresScopeHandle;
 @end
 
 
@@ -76,20 +85,14 @@
 
  @param state The current state of the component.
  */
-- (id<CKTreeNodeComponentProtocol>)render:(id)state;
-
-@end
+- (id<CKTreeNodeComponentProtocol> _Nullable)render:(id _Nullable)state;
 
 /**
- Render component with multi child.
+ Returns the computed child component, if there is one.
  */
-@protocol CKRenderWithChildrenComponentProtocol <CKRenderComponentProtocol>
-
-/*
- Returns a vector of 'CKComponent' children that will be rendered to the screen.
-
- @param state The current state of the component.
- */
-- (std::vector<id<CKTreeNodeComponentProtocol>>)renderChildren:(id)state;
-
+- (id<CKTreeNodeComponentProtocol> _Nullable)child;
 @end
+
+NS_ASSUME_NONNULL_END
+
+#endif

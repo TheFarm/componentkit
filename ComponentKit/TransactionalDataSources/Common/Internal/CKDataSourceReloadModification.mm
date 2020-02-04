@@ -48,14 +48,20 @@ using namespace CKComponentControllerHelper;
 
   NSMutableArray *newSections = [NSMutableArray array];
   NSMutableSet *updatedIndexPaths = [NSMutableSet set];
+  NSMutableArray<CKComponentController *> *addedComponentControllers = [NSMutableArray array];
   NSMutableArray<CKComponentController *> *invalidComponentControllers = [NSMutableArray array];
   [[oldState sections] enumerateObjectsUsingBlock:^(NSArray *items, NSUInteger sectionIdx, BOOL *sectionStop) {
     NSMutableArray *newItems = [NSMutableArray array];
     [items enumerateObjectsUsingBlock:^(CKDataSourceItem *item, NSUInteger itemIdx, BOOL *itemStop) {
       [updatedIndexPaths addObject:[NSIndexPath indexPathForItem:itemIdx inSection:sectionIdx]];
-      // On reload, we would like avoid component reuse - by passing `ignoreComponentReuseOptimizations = YES`, we make sure that all the components will be recreated.
-      CKDataSourceItem *const newItem = CKBuildDataSourceItem([item scopeRoot], {}, sizeRange, configuration, [item model], context, YES);
+      // On reload, we would like avoid component reuse - by passing `enableComponentReuseOptimizations = NO`, we make sure that all the components will be recreated.
+      CKDataSourceItem *const newItem = CKBuildDataSourceItem([item scopeRoot], {}, sizeRange, configuration, [item model], context, NO);
       [newItems addObject:newItem];
+      for (const auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
+                                                                                                   item.scopeRoot,
+                                                                                                   &CKComponentControllerInitializeEventPredicate)) {
+        [addedComponentControllers addObject:componentController];
+      }
       for (const auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
                                                                                                      item.scopeRoot,
                                                                                                      &CKComponentControllerInvalidateEventPredicate)) {
@@ -81,7 +87,9 @@ using namespace CKComponentControllerHelper;
   return [[CKDataSourceChange alloc] initWithState:newState
                                      previousState:oldState
                                     appliedChanges:appliedChanges
+                                  appliedChangeset:nil
                                  deferredChangeset:nil
+                         addedComponentControllers:addedComponentControllers
                        invalidComponentControllers:invalidComponentControllers];
 }
 

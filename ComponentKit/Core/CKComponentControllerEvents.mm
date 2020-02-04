@@ -10,7 +10,8 @@
 
 #import "CKComponentControllerEvents.h"
 
-#import "CKInternalHelpers.h"
+#import <ComponentKit/CKInternalHelpers.h>
+
 #import "CKComponentController.h"
 #import "CKComponentControllerProtocol.h"
 
@@ -22,6 +23,11 @@ BOOL CKComponentControllerAppearanceEventPredicate(id<CKComponentControllerProto
 BOOL CKComponentControllerDisappearanceEventPredicate(id<CKComponentControllerProtocol> controller)
 {
   return CKSubclassOverridesInstanceMethod([CKComponentController class], [controller class], @selector(componentTreeDidDisappear));
+}
+
+BOOL CKComponentControllerInitializeEventPredicate(id<CKComponentControllerProtocol> controller)
+{
+  return CKSubclassOverridesInstanceMethod([CKComponentController class], [controller class], @selector(didInit));
 }
 
 BOOL CKComponentControllerInvalidateEventPredicate(id<CKComponentControllerProtocol> controller)
@@ -42,6 +48,14 @@ void CKComponentScopeRootAnnounceControllerDisappearance(CKComponentScopeRoot *s
   [scopeRoot enumerateComponentControllersMatchingPredicate:&CKComponentControllerDisappearanceEventPredicate block:^(id<CKComponentControllerProtocol> scopedController) {
     CKComponentController *controller = (CKComponentController *)scopedController;
     [controller componentTreeDidDisappear];
+  }];
+}
+
+void CKComponentScopeRootAnnounceControllerInitialization(CKComponentScopeRoot *scopeRoot)
+{
+  [scopeRoot enumerateComponentControllersMatchingPredicate:&CKComponentControllerInitializeEventPredicate block:^(id<CKComponentControllerProtocol> scopedController) {
+    CKComponentController *controller = (CKComponentController *)scopedController;
+    [controller didInit];
   }];
 }
 

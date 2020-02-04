@@ -8,15 +8,23 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <vector>
 
 #import <UIKit/UIKit.h>
 #import <ComponentKit/CKComponentControllerProtocol.h>
 #import <ComponentKit/CKComponentLayout.h>
+#import <ComponentKit/CKComponent.h>
 
 @class CKComponent;
 
 @interface CKComponentController<__covariant ComponentType:CKComponent *> : NSObject <CKComponentControllerProtocol>
+
+/** The controller was initialised. Called on the main thread. */
+- (void)didInit NS_REQUIRES_SUPER;
 
 /** The controller's component is not mounted, but is about to be. */
 - (void)willMount NS_REQUIRES_SUPER;
@@ -53,10 +61,23 @@
 /** Invoked immediately before the component relinquishes its view to be reused by other components. */
 - (void)componentWillRelinquishView NS_REQUIRES_SUPER;
 
-/** Corresponds to -willDisplayCell:for{Row|Item}AtIndexPath:. Not invoked for CKComponentHostingViews. */
+/**
+ As suggested in name, this lifecycle method will only be called when the entire component tree will appear on screen.
+ That means if a component tree has already appeared on screen and it's still visible, a component that is added to this
+ component tree hierarchy will not have this lifecycle method called.
+ NOTE:
+ - In the context of `UICollectionView`, this corresponds to `willDisplayCell:forItemAtIndexPath:`.
+ - In the context of `CKComponentHostingView`, this corresponds to `hostingViewWillAppear`.
+ */
 - (void)componentTreeWillAppear NS_REQUIRES_SUPER;
 
-/** Corresponds to -didEndDisplayingCell:for{Row|Item}AtIndexPath:. Not invoked for CKComponentHostingViews. */
+/**
+ As suggested in name, this lifecycle method will only be called when the entire component tree did disappear.
+ That means if a component is removed from its component tree hierarchy, this lifecycle method will not be called.
+ NOTE:
+ - In the context of `UICollectionView`, this corresponds to `didEndDisplayingCell:forItemAtIndexPath:`.
+ - In the context of `CKComponentHostingView`, this corresponds to `hostingViewDidDisappear`.
+ */
 - (void)componentTreeDidDisappear NS_REQUIRES_SUPER;
 
 /** Called on the main thread prior to controller deallocation **/
@@ -73,6 +94,12 @@
 
 /** The view created by the component, if currently mounted. */
 @property (nonatomic, strong, readonly) UIView *view;
+
+/**
+ This returns the component that was last mounted. It can be `nil` if the latest generation hasn't been mounted.
+ NOTE: this is for code migration purpose, please DO NOT USE.
+ */
+- (ComponentType)lastMountedComponent;
 
 /**
  While the controller's component is mounted, returns its next responder. This is the first of:
@@ -100,3 +127,5 @@
 + (instancetype)new NS_UNAVAILABLE;
 
 @end
+
+#endif

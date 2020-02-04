@@ -11,7 +11,8 @@
 #import "CKComponentRootView.h"
 #import "CKComponentRootViewInternal.h"
 
-#import "CKAssert.h"
+#import <ComponentKit/CKAssert.h>
+
 #import "CKComponentAttachControllerInternal.h"
 
 @implementation CKComponentRootView {
@@ -24,6 +25,11 @@ static NSMutableArray *hitTestHooks;
 {
   CKAssertMainThread();
   _allowTapPassthrough = allowTapPassthrough;
+}
+
+- (void)willEnterViewPool
+{
+  // Subclass should override this to release resource.
 }
 
 + (void)addHitTestHook:(CKComponentRootViewHitTestHook)hook

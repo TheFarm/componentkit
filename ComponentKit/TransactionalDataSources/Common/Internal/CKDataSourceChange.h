@@ -20,11 +20,14 @@
 - (instancetype)initWithState:(CKDataSourceState *)state
                 previousState:(CKDataSourceState *)previousState
                appliedChanges:(CKDataSourceAppliedChanges *)appliedChanges
+             appliedChangeset:(CKDataSourceChangeset *)appliedChangeset
             deferredChangeset:(CKDataSourceChangeset *)deferredChangeset
+    addedComponentControllers:(NSArray<CKComponentController *> *)addedComponentControllers
   invalidComponentControllers:(NSArray<CKComponentController *> *)invalidComponentControllers;
 @property (nonatomic, strong, readonly) CKDataSourceState *state;
 @property (nonatomic, strong, readonly) CKDataSourceState *previousState;
 @property (nonatomic, strong, readonly) CKDataSourceAppliedChanges *appliedChanges;
+@property (nonatomic, strong, readonly) CKDataSourceChangeset *appliedChangeset;
 /**
  * A changeset that should be applied immediately afterward.
  *
@@ -32,6 +35,10 @@
  * changesets for the purpose of optimizing the performance of the initial render.
  */
 @property (nonatomic, strong, readonly) CKDataSourceChangeset *deferredChangeset;
+/**
+ Component controllers that are only present in the new state.
+ */
+@property (nonatomic, strong, readonly) NSArray<CKComponentController *> *addedComponentControllers;
 /**
  Component controllers that are not presented in the new state.
  */

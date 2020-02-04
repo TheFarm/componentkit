@@ -9,9 +9,10 @@
  */
 #import "CKStatefulViewComponentController.h"
 
+#import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKDispatch.h>
+
 #import "CKStatefulViewReusePool.h"
-#import "CKAssert.h"
-#import "CKDispatch.h"
 
 #import <unordered_map>
 
@@ -54,7 +55,7 @@ public:
 
     return nil;
   };
-  
+
   NSUInteger viewCount()
   {
     return _entries.size();

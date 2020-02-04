@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <UIKit/UIKit.h>
 
 #import <ComponentKit/CKAssert.h>
@@ -43,6 +47,8 @@ struct CKComponentBoundsAnimation {
   CKComponentBoundsAnimationMode mode;
   UIViewAnimationOptions options;
 
+  /** `UIViewAnimationOptionCurve` in `options` will be ignored if this is specified */
+  CAMediaTimingFunction *timingFunction;
   /** Ignored unless mode is Spring, in which case it specifies the damping ratio passed to UIKit. */
   CGFloat springDampingRatio;
   /** Ignored unless mode is Spring, in which case it specifies the initial velocity passed to UIKit. */
@@ -65,3 +71,5 @@ auto operator !=(const CKComponentBoundsAnimation &lhs, const CKComponentBoundsA
 void CKComponentBoundsAnimationApply(const CKComponentBoundsAnimation &animation,
                                      void (^animations)(void),
                                      void (^completion)(BOOL finished));
+
+#endif

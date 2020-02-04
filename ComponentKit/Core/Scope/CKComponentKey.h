@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKThreadLocalComponentScope.h>
@@ -22,7 +26,7 @@
    CKComponentKey key(contact.uniqueIdentifier);
    return [ContactComponent newWithContact:context];
  });
- 
+
  Each ContactComponent will have its own state; if contacts are inserted, deleted, or moved they will maintain the
  correct state.
  */
@@ -36,3 +40,5 @@ private:
   CKThreadLocalComponentScope *_threadLocalScope;
   id<NSObject> _key;
 };
+
+#endif

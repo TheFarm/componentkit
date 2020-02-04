@@ -10,16 +10,17 @@
 
 #import "CKComponentAnimations.h"
 
-#import "CKCasting.h"
-#import "CKCollection.h"
+#import <ComponentKit/CKCasting.h>
+#import <ComponentKit/CKCollection.h>
+#import <ComponentKit/CKInternalHelpers.h>
+
 #import "CKComponentEvents.h"
 #import "CKComponentScopeRoot.h"
 #import "CKComponentInternal.h"
 #import "CKComponentSubclass.h"
-#import "CKInternalHelpers.h"
 
 namespace CK {
-  static auto getScopeHandle(id<CKComponentProtocol> const c) {
+  static auto getScopeHandle(id<CKMountable> const c) {
     const auto scopeHandle = objCForceCast<CKComponent>(c).scopeHandle;
     CKCAssertNotNil(scopeHandle, @"Scope must be provided for component animation");
     return scopeHandle;

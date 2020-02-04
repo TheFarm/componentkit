@@ -11,12 +11,14 @@
 #import "CKComponentScopeHandle.h"
 
 #include <mutex>
+#import <stdatomic.h>
+
+#import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKMutex.h>
 
 #import "CKComponentScopeRoot.h"
 #import "CKComponentSubclass.h"
 #import "CKComponentInternal.h"
-#import "CKInternalHelpers.h"
-#import "CKMutex.h"
 #import "CKComponentProtocol.h"
 #import "CKComponentControllerProtocol.h"
 #import "CKThreadLocalComponentScope.h"
@@ -47,7 +49,7 @@
   // We can rely on this infomration to increase the `componentAllocations` counter.
   currentScope->componentAllocations++;
 
-  CKComponentScopeHandle *handle = currentScope->stack.top().frame.handle;
+  CKComponentScopeHandle *handle = currentScope->stack.top().frame.scopeHandle;
   if ([handle acquireFromComponent:component]) {
     [currentScope->newScopeRoot registerComponent:component];
     return handle;
@@ -65,9 +67,9 @@
                   componentClass:(Class)componentClass
                     initialState:(id)initialState
 {
-  static int32_t nextGlobalIdentifier = 0;
+  static atomic_int nextGlobalIdentifier = 0;
   return [self initWithListener:listener
-               globalIdentifier:OSAtomicIncrement32(&nextGlobalIdentifier)
+               globalIdentifier:atomic_fetch_add_explicit(&nextGlobalIdentifier, 1, memory_order_relaxed)
                  rootIdentifier:rootIdentifier
                  componentClass:componentClass
                           state:initialState
@@ -234,7 +236,7 @@
 {
   if (self = [super init]) {
     static CKScopedResponderUniqueIdentifier nextIdentifier = 0;
-    _uniqueIdentifier = OSAtomicIncrement32(&nextIdentifier);
+    _uniqueIdentifier = atomic_fetch_add_explicit(&nextIdentifier, 1, memory_order_relaxed);
   }
 
   return self;

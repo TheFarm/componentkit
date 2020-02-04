@@ -10,18 +10,18 @@
 
 #import "CKComponent+UIView.h"
 
-#import <objc/runtime.h>
+#import <ComponentKit/CKMountedObjectForView.h>
 
-static char const kViewComponentKey = ' ';
+#import "CKComponent.h"
 
 /** Strong reference back to the associated component while the component is mounted. */
 CKComponent *CKMountedComponentForView(UIView *view)
 {
-  return objc_getAssociatedObject(view, &kViewComponentKey);
+  return (CKComponent *)CKMountedObjectForView(view);
 }
 
 /** This is for internal use by the framework only. */
 void CKSetMountedComponentForView(UIView *view, CKComponent *component)
 {
-  objc_setAssociatedObject(view, &kViewComponentKey, component, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  CKSetMountedObjectForView(view, component);
 }

@@ -8,23 +8,26 @@
  *
  */
 
-#ifndef __cplusplus
-#error This file must be compiled as Obj-C++. If you are importing it, you must change your file extension to .mm.
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
+#if !defined(__cplusplus) && CK_NOT_SWIFT
+#error This file must be compiled Obj-C++ or imported from Swift. Objective-C files should have their extension changed to .mm.
 #endif
 
 #import <UIKit/UIKit.h>
 
+#import <ComponentKit/CKComponentLayout.h>
 #import <ComponentKit/CKComponentProtocol.h>
 #import <ComponentKit/CKComponentSize.h>
 #import <ComponentKit/CKComponentViewConfiguration.h>
+#import <ComponentKit/CKMountable.h>
 
-struct CKComponentViewContext {
-  __kindof UIView *view;
-  CGRect frame;
-};
+NS_ASSUME_NONNULL_BEGIN
 
 /** A component is an immutable object that specifies how to configure a view, loosely inspired by React. */
-@interface CKComponent<__covariant CKComponentStateType:id> : NSObject <CKComponentProtocol>
+@interface CKComponent : NSObject <CKMountable, CKComponentProtocol>
 
 /**
  @param view A struct describing the view for this component. Pass {} to specify that no view should be created.
@@ -53,6 +56,16 @@ struct CKComponentViewContext {
  - Its supercomponent;
  - The view the component is mounted within, if it is the root component.
  */
-- (id)nextResponder;
+- (id _Nullable)nextResponder;
 
 @end
+
+#define CK_COMPONENT_INIT_UNAVAILABLE \
++ (instancetype)newWithView:(const CKComponentViewConfiguration &)view \
+                       size:(const CKComponentSize &)size NS_UNAVAILABLE
+
+NS_ASSUME_NONNULL_END
+
+#import <ComponentKit/ComponentBuilder.h>
+
+#endif

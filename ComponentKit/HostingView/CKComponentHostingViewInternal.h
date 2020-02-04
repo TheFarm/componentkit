@@ -8,17 +8,21 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <ComponentKit/CKBuildComponent.h>
 #import <ComponentKit/CKComponentHostingView.h>
 #import <ComponentKit/CKComponentHostingViewProtocol.h>
 #import <ComponentKit/CKDimension.h>
 #import <ComponentKit/CKComponentLayout.h>
-#import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKComponentScopeTypes.h>
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKInspectableView.h>
 #import <ComponentKit/CKOptional.h>
+#import <ComponentKit/ComponentRootViewPool.h>
 
 #import <unordered_set>
 
@@ -30,9 +34,14 @@ struct CKComponentHostingViewOptions {
   /// A initial size that will be used for hosting view before first generation of component is created.
   /// Specifying a initial size enables the ability to handle the first model/context update asynchronously.
   CK::Optional<CGSize> initialSize;
+  /// A root view pool that hosting view can retrieve its container view from.
+  CK::Optional<CK::Component::RootViewPool> rootViewPool =
+  CKReadGlobalConfig().enableGlobalRootViewPoolInHostingView
+  ? CK::Optional<CK::Component::RootViewPool>(CK::Component::GlobalRootViewPool())
+  : CK::none;
 };
 
-@interface CKComponentHostingView<__covariant ModelType: id<NSObject>, __covariant ContextType: id<NSObject>> () <CKComponentHostingViewProtocol, CKComponentStateListener>
+@interface CKComponentHostingView<__covariant ModelType: id<NSObject>, __covariant ContextType: id<NSObject>> () <CKComponentHostingViewProtocol>
 
 /**
  @param componentProvider  provider conforming to CKComponentProvider protocol.
@@ -72,3 +81,5 @@ struct CKComponentHostingViewOptions {
 - (void)reloadWithMode:(CKUpdateMode)mode;
 
 @end
+
+#endif

@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <unordered_map>
@@ -15,7 +19,7 @@
 #import <ComponentKit/CKComponentAnimation.h>
 #import <ComponentKit/CKComponentLayout.h>
 #import <ComponentKit/CKComponentTreeDiff.h>
-#import <ComponentKit/CKEqualityHashHelpers.h>
+#import <ComponentKit/CKEqualityHelpers.h>
 
 @class CKComponentScopeRoot;
 
@@ -54,3 +58,5 @@ namespace CK {
 
   auto animationsForComponents(const ComponentTreeDiff& animatedComponents, UIView *const hostView) -> CKComponentAnimations;
 }
+
+#endif

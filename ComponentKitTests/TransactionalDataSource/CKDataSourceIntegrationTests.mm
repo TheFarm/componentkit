@@ -13,16 +13,16 @@
 
 #import <ComponentKitTestHelpers/CKTestRunLoopRunning.h>
 
-#import "CKComponent.h"
-#import "CKComponentProvider.h"
-#import "CKComponentScope.h"
-#import "CKComponentSubclass.h"
-#import "CKCompositeComponent.h"
-#import "CKComponentController.h"
-#import "CKCollectionViewDataSource.h"
-#import "CKDataSourceConfiguration.h"
-#import "CKDataSourceConfigurationInternal.h"
-#import "CKDataSourceChangeset.h"
+#import <ComponentKit/CKComponent.h>
+#import <ComponentKit/CKComponentProvider.h>
+#import <ComponentKit/CKComponentScope.h>
+#import <ComponentKit/CKComponentSubclass.h>
+#import <ComponentKit/CKCompositeComponent.h>
+#import <ComponentKit/CKComponentController.h>
+#import <ComponentKit/CKCollectionViewDataSource.h>
+#import <ComponentKit/CKDataSourceConfiguration.h>
+#import <ComponentKit/CKDataSourceConfigurationInternal.h>
+#import <ComponentKit/CKDataSourceChangeset.h>
 
 static NSString *const kOverrideDidPrepareLayoutForComponent = @"kOverrideDidPrepareLayoutForComponent";
 
@@ -136,7 +136,7 @@ static NSString *const kOverrideDidPrepareLayoutForComponent = @"kOverrideDidPre
 {
   [super setUp];
 
-  self.itemSize = [[UIScreen mainScreen] bounds].size;
+  self.itemSize = CGSizeMake(320, 480);
 
   self.components = [NSMutableArray new];
   self.componentsDictionary = [NSMutableDictionary dictionary];
@@ -161,8 +161,10 @@ static NSString *const kOverrideDidPrepareLayoutForComponent = @"kOverrideDidPre
   UICollectionViewFlowLayout *flowLayout = [UICollectionViewFlowLayout new];
   flowLayout.itemSize = self.itemSize;
 
-  UICollectionViewController *collectionViewController = [[UICollectionViewController alloc]
-                                   initWithCollectionViewLayout:flowLayout];
+  UICollectionView *collectionView =
+  [[UICollectionView alloc]
+   initWithFrame:CGRectMake(0, 0, self.itemSize.width, self.itemSize.height)
+   collectionViewLayout:flowLayout];
 
   CKDataSourceConfiguration *config = [[CKDataSourceConfiguration alloc]
                                        initWithComponentProvider:(id)self
@@ -172,7 +174,7 @@ static NSString *const kOverrideDidPrepareLayoutForComponent = @"kOverrideDidPre
                                        componentPredicates:{}
                                        componentControllerPredicates:{}
                                        analyticsListener:nil];
-  return [[CKCollectionViewDataSource alloc] initWithCollectionView:collectionViewController.collectionView
+  return [[CKCollectionViewDataSource alloc] initWithCollectionView:collectionView
                                                      supplementaryViewDataSource:nil
                                                                    configuration:config];
 }

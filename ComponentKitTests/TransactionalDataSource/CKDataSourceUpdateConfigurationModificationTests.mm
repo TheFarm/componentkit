@@ -23,10 +23,11 @@
 #import <ComponentKit/CKDataSourceConfigurationInternal.h>
 #import <ComponentKit/CKDataSourceItem.h>
 #import <ComponentKit/CKDataSourceState.h>
+#import <ComponentKit/CKDataSourceUpdateConfigurationModification.h>
+
 #import <ComponentKitTestHelpers/CKLifecycleTestComponent.h>
 
 #import "CKDataSourceStateTestHelpers.h"
-#import "CKDataSourceUpdateConfigurationModification.h"
 
 static NSString *const kTestContextForLifecycleComponent = @"kTestContextForLifecycleComponent";
 
@@ -43,7 +44,8 @@ static NSString *const kTestContextForLifecycleComponent = @"kTestContextForLife
   CKLifecycleTestComponent *lifecycleComponent = [context isEqual:kTestContextForLifecycleComponent]
   ? [CKLifecycleTestComponent newWithView:{} size:{}]
   : nil;
-  const auto c = [super newWithComponent:lifecycleComponent ?: [CKComponent newWithView:{} size:{}]];
+  const auto c = [super newWithComponent:lifecycleComponent ?: CK::ComponentBuilder()
+                                                                   .build()];
   if (c) {
     c->_context = context;
     c->_lifecycleComponent = lifecycleComponent;
@@ -174,7 +176,7 @@ static NSString *const kTestContextForLifecycleComponent = @"kTestContextForLife
 
 static CKComponent *AlternateComponentProvider(id<NSObject> model, id<NSObject> context)
 {
-  return [CKCompositeComponent newWithComponent:[CKComponent new]];
+  return CK::CompositeComponentBuilder().component([CKComponent new]).build();
 }
 
 static CKComponent *ComponentProvider(id<NSObject> _, id<NSObject> context)

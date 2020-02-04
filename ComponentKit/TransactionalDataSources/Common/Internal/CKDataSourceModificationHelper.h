@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentLayout.h>
@@ -22,4 +26,6 @@ CKDataSourceItem *CKBuildDataSourceItem(CKComponentScopeRoot *previousRoot,
                                         CKDataSourceConfiguration *configuration,
                                         id model,
                                         id context,
-                                        BOOL ignoreComponentReuseOptimizations = NO);
+                                        BOOL enableComponentReuseOptimizations = YES);
+
+#endif

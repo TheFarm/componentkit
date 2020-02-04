@@ -20,10 +20,11 @@
 #import <ComponentKit/CKDataSourceChange.h>
 #import <ComponentKit/CKDataSourceItem.h>
 #import <ComponentKit/CKDataSourceState.h>
+#import <ComponentKit/CKDataSourceUpdateStateModification.h>
+
 #import <ComponentKitTestHelpers/CKLifecycleTestComponent.h>
 
 #import "CKDataSourceStateTestHelpers.h"
-#import "CKDataSourceUpdateStateModification.h"
 
 static NSString *const kTestStateForLifecycleComponent = @"kTestStateForLifecycleComponent";
 
@@ -40,7 +41,8 @@ static NSString *const kTestStateForLifecycleComponent = @"kTestStateForLifecycl
   CKLifecycleTestComponent *lifecycleComponent = [scope.state() isEqual:kTestStateForLifecycleComponent]
   ? [CKLifecycleTestComponent newWithView:{} size:{}]
   : nil;
-  const auto c = [super newWithComponent:lifecycleComponent ?: [CKComponent newWithView:{} size:{}]];
+  const auto c = [super newWithComponent:lifecycleComponent ?: CK::ComponentBuilder()
+                                                                   .build()];
   if (c) {
     c->_state = scope.state();
     c->_lifecycleComponent = lifecycleComponent;
@@ -66,7 +68,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 - (void)componentScopeHandle:(CKComponentScopeHandle *)handle
               rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
        didReceiveStateUpdate:(id (^)(id))stateUpdate
-                    metadata:(const CKStateUpdateMetadata)metadata
+                    metadata:(const CKStateUpdateMetadata &)metadata
                         mode:(CKUpdateMode)mode
 {
   _pendingStateUpdates[rootIdentifier][handle].push_back(stateUpdate);
@@ -84,7 +86,8 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 
   NSIndexPath *ip = [NSIndexPath indexPathForItem:2 inSection:0];
   CKDataSourceItem *item = [originalState objectAtIndexPath:ip];
-  [[item rootLayout].component() updateState:^(id state){return @"hello";} mode:CKUpdateModeSynchronous];
+  CKComponent *c = (CKComponent *)[item rootLayout].component();
+  [c updateState:^(id state){return @"hello";} mode:CKUpdateModeSynchronous];
 
   CKDataSourceUpdateStateModification *updateStateModification =
   [[CKDataSourceUpdateStateModification alloc] initWithStateUpdates:_pendingStateUpdates];
@@ -111,7 +114,8 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 
   NSIndexPath *ip = [NSIndexPath indexPathForItem:0 inSection:0];
   CKDataSourceItem *item = [originalState objectAtIndexPath:ip];
-  [[item rootLayout].component() updateState:^(id state){return @"hello";} mode:CKUpdateModeSynchronous];
+  CKComponent *c = (CKComponent *)[item rootLayout].component();
+  [c updateState:^(id state){return @"hello";} mode:CKUpdateModeSynchronous];
 
   CKDataSourceUpdateStateModification *updateStateModification =
   [[CKDataSourceUpdateStateModification alloc] initWithStateUpdates:_pendingStateUpdates];
@@ -130,8 +134,9 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 
   NSIndexPath *ip = [NSIndexPath indexPathForItem:0 inSection:0];
   CKDataSourceItem *item = [originalState objectAtIndexPath:ip];
-  [[item rootLayout].component() updateState:^(NSString *state){return @"hello";} mode:CKUpdateModeSynchronous];
-  [[item rootLayout].component() updateState:^(NSString *state){return [state stringByAppendingString:@" world"];} mode:CKUpdateModeSynchronous];
+  CKComponent *c = (CKComponent *)[item rootLayout].component();
+  [c updateState:^(NSString *state){return @"hello";} mode:CKUpdateModeSynchronous];
+  [c updateState:^(NSString *state){return [state stringByAppendingString:@" world"];} mode:CKUpdateModeSynchronous];
 
   CKDataSourceUpdateStateModification *updateStateModification =
   [[CKDataSourceUpdateStateModification alloc] initWithStateUpdates:_pendingStateUpdates];
@@ -149,17 +154,15 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto originalState = CKDataSourceTestState(ComponentProvider, self, 1, 1);
 
   const auto ip = [NSIndexPath indexPathForItem:0 inSection:0];
-  [[[originalState objectAtIndexPath:ip] rootLayout].component()
-   updateState:^(NSString *state){return kTestStateForLifecycleComponent;}
-   mode:CKUpdateModeSynchronous];
+  CKComponent *c = (CKComponent *)[[originalState objectAtIndexPath:ip] rootLayout].component();
+  [c updateState:^(NSString *state){return kTestStateForLifecycleComponent;} mode:CKUpdateModeSynchronous];
 
   auto updateStateModification = [[CKDataSourceUpdateStateModification alloc] initWithStateUpdates:_pendingStateUpdates];
   auto change = [updateStateModification changeFromState:originalState];
 
   const auto componentController = ((CKStatefulTestComponent *)[[change.state objectAtIndexPath:ip] rootLayout].component()).lifecycleComponent.controller;
-  [[[change.state objectAtIndexPath:ip] rootLayout].component()
-   updateState:^(NSString *state){return @"";}
-   mode:CKUpdateModeSynchronous];
+  CKComponent *c2 = (CKComponent *)[[change.state objectAtIndexPath:ip] rootLayout].component();
+  [c2 updateState:^(NSString *state){return @"";} mode:CKUpdateModeSynchronous];
 
   updateStateModification = [[CKDataSourceUpdateStateModification alloc] initWithStateUpdates:_pendingStateUpdates];
   change = [updateStateModification changeFromState:change.state];

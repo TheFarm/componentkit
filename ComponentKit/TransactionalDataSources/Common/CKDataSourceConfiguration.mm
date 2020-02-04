@@ -11,9 +11,9 @@
 #import "CKDataSourceConfiguration.h"
 #import "CKDataSourceConfigurationInternal.h"
 
-#import "CKEqualityHashHelpers.h"
-#import "CKGlobalConfig.h"
-#import "CKMacros.h"
+#import <ComponentKit/CKEqualityHelpers.h>
+#import <ComponentKit/CKGlobalConfig.h>
+#import <ComponentKit/CKMacros.h>
 
 static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return nil; }
 
@@ -111,6 +111,10 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
     _componentControllerPredicates = componentControllerPredicates;
     _analyticsListener = analyticsListener;
     _options = options;
+    // Set a default value from the global config.
+    if (!options.updateComponentInControllerAfterBuild.hasValue()) {
+      _options.updateComponentInControllerAfterBuild = CKReadGlobalConfig().updateComponentInControllerAfterBuild;
+    }
   }
   return self;
 }

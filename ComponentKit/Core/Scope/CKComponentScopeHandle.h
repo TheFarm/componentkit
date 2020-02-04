@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentScopeTypes.h>
@@ -15,6 +19,7 @@
 #import <ComponentKit/CKStateUpdateMetadata.h>
 #import <ComponentKit/CKTreeNodeTypes.h>
 #import <ComponentKit/CKUpdateMode.h>
+#import <stdatomic.h>
 
 @class CKComponent;
 @class CKComponentScopeRoot;
@@ -99,7 +104,7 @@ struct std::equal_to<CKComponentScopeHandle *>
   }
 };
 
-typedef int32_t CKScopedResponderUniqueIdentifier;
+typedef atomic_int CKScopedResponderUniqueIdentifier;
 typedef int CKScopedResponderKey;
 
 @interface CKScopedResponder : NSObject
@@ -117,3 +122,5 @@ typedef int CKScopedResponderKey;
 - (id)responderForKey:(CKScopedResponderKey)key;
 
 @end
+
+#endif

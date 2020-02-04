@@ -8,10 +8,15 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 struct CKComponentLayout;
-@class CKComponent;
+
+@protocol CKMountable;
 
 /** Represents an info for a component that is being used more than once in a component tree */
 struct CKDuplicateComponentInfo {
@@ -19,7 +24,7 @@ struct CKDuplicateComponentInfo {
    The component that is being used more than once.
    @var CKComponent
    */
-  CKComponent *component;
+  id<CKMountable> component;
 
   /**
    The backtrace description starting from the component.
@@ -35,3 +40,5 @@ CKDuplicateComponentInfo CKFindDuplicateComponent(const CKComponentLayout &layou
  @param layout The top-level component layout of the component hierarchy.
  */
  void CKDetectDuplicateComponent(const CKComponentLayout &layout);
+
+#endif

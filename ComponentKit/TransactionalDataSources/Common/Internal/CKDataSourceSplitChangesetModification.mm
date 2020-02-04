@@ -32,12 +32,13 @@
 #import "CKDataSourceModificationHelper.h"
 #import "CKIndexSetDescription.h"
 #import "CKInvalidChangesetOperationType.h"
+#import "CKFatal.h"
 
 using namespace CKComponentControllerHelper;
 
 @implementation CKDataSourceSplitChangesetModification
 {
-  id<CKComponentStateListener> _stateListener;
+  __weak id<CKComponentStateListener> _stateListener;
   NSDictionary *_userInfo;
   CKDataSourceViewport _viewport;
   CKDataSourceQOS _qos;
@@ -70,6 +71,7 @@ using namespace CKComponentControllerHelper;
   ? splitChangesetOptions.viewportBoundingSize
   : _viewport.size;
 
+  NSMutableArray<CKComponentController *> *addedComponentControllers = [NSMutableArray array];
   NSMutableArray<CKComponentController *> *invalidComponentControllers = [NSMutableArray array];
 
   NSMutableArray *newSections = [NSMutableArray array];
@@ -86,6 +88,7 @@ using namespace CKComponentControllerHelper;
     const CKDataSourceSplitUpdateResult result =
     splitUpdatedItems(newSections,
                       updatedItems,
+                      addedComponentControllers,
                       invalidComponentControllers,
                       sizeRange,
                       configuration,
@@ -127,6 +130,11 @@ using namespace CKComponentControllerHelper;
       CKDataSourceItem *const oldItem = section[indexPath.item];
       CKDataSourceItem *const item = CKBuildDataSourceItem([oldItem scopeRoot], {}, sizeRange, configuration, model, context);
       [section replaceObjectAtIndex:indexPath.item withObject:item];
+      for (const auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(item.scopeRoot,
+                                                                                                   oldItem.scopeRoot,
+                                                                                                   &CKComponentControllerInitializeEventPredicate)) {
+        [addedComponentControllers addObject:componentController];
+      }
       for (const auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(item.scopeRoot,
                                                                                                      oldItem.scopeRoot,
                                                                                                      &CKComponentControllerInvalidateEventPredicate)) {
@@ -355,11 +363,21 @@ using namespace CKComponentControllerHelper;
                                                insertedSections:[_changeset insertedSections]
                                              insertedIndexPaths:[NSSet setWithArray:[initialInsertedItems allKeys]]
                                                        userInfo:_userInfo];
+  CKDataSourceChangeset *appliedChangeset =
+  [[[[[[[[CKDataSourceChangesetBuilder dataSourceChangeset]
+         withUpdatedItems:initialUpdatedItems]
+        withRemovedItems:[_changeset removedItems]]
+       withRemovedSections:[_changeset removedSections]]
+      withMovedItems:[_changeset movedItems]]
+     withInsertedSections:[_changeset insertedSections]]
+    withInsertedItems:initialInsertedItems] build];
 
   return [[CKDataSourceChange alloc] initWithState:newState
                                      previousState:oldState
                                     appliedChanges:appliedChanges
+                                  appliedChangeset:appliedChangeset
                                  deferredChangeset:createDeferredChangeset(deferredInsertedItems, computeDeferredItems(sectionsForDeferredUpdatedItems))
+                         addedComponentControllers:addedComponentControllers
                        invalidComponentControllers:invalidComponentControllers];
 }
 
@@ -430,6 +448,7 @@ struct CKDataSourceSplitUpdateResult {
 
 static CKDataSourceSplitUpdateResult splitUpdatedItems(NSArray<NSArray<CKDataSourceItem *> *> *sections,
                                                        NSDictionary<NSIndexPath *, id> *updatedItems,
+                                                       NSMutableArray<CKComponentController *> *addedComponentControllers,
                                                        NSMutableArray<CKComponentController *> *invalidComponentControllers,
                                                        const CKSizeRange &sizeRange,
                                                        CKDataSourceConfiguration *configuration,
@@ -477,6 +496,11 @@ static CKDataSourceSplitUpdateResult splitUpdatedItems(NSArray<NSArray<CKDataSou
         computedItems[indexPath] = newItem;
         initialUpdatedItems[indexPath] = updatedModel;
         contentSize = addSizeToSize(contentSize, [newItem rootLayout].size());
+        for (const auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
+                                                                                                     item.scopeRoot,
+                                                                                                     &CKComponentControllerInitializeEventPredicate)) {
+          [addedComponentControllers addObject:componentController];
+        }
         for (const auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
                                                                                                        item.scopeRoot,
                                                                                                        &CKComponentControllerInvalidateEventPredicate)) {

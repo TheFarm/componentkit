@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <vector>
@@ -19,9 +23,18 @@
 
 namespace CKComponentControllerHelper {
   /**
+   Return component controllers, which match the predicate, were just added in the new scope root.
+   */
+  auto addedControllersFromPreviousScopeRootMatchingPredicate(CKComponentScopeRoot *newRoot,
+                                                              CKComponentScopeRoot *previousRoot,
+                                                              CKComponentControllerPredicate predicate) -> std::vector<CKComponentController *>;
+
+  /**
    Return component controllers, which match the predicate, that are not presented in the new scope root.
    */
   auto removedControllersFromPreviousScopeRootMatchingPredicate(CKComponentScopeRoot *newRoot,
                                                                 CKComponentScopeRoot *previousRoot,
                                                                 CKComponentControllerPredicate predicate) -> std::vector<CKComponentController *>;
 };
+
+#endif

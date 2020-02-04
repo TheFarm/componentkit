@@ -16,15 +16,17 @@
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKRenderComponentProtocol.h>
 #import <ComponentKit/CKRootTreeNode.h>
+#import <ComponentKit/CKMutex.h>
+#import <stdatomic.h>
 
 #include <tuple>
 
-#import "CKMutex.h"
 #import "CKThreadLocalComponentScope.h"
+#import "CKRenderHelpers.h"
 
 @interface CKTreeNode ()
 @property (nonatomic, strong, readwrite) id<CKTreeNodeComponentProtocol> component;
-@property (nonatomic, strong, readwrite) CKComponentScopeHandle *handle;
+@property (nonatomic, strong, readwrite) CKComponentScopeHandle *scopeHandle;
 @property (nonatomic, assign, readwrite) CKTreeNodeIdentifier nodeIdentifier;
 @end
 
@@ -35,91 +37,42 @@
 
 // Base initializer
 - (instancetype)initWithPreviousNode:(id<CKTreeNodeProtocol>)previousNode
-                              handle:(CKComponentScopeHandle *)handle
+                         scopeHandle:(CKComponentScopeHandle *)scopeHandle
 {
-  static int32_t nextGlobalIdentifier = 0;
+  static atomic_int nextGlobalIdentifier = 0;
   if (self = [super init]) {
-    _handle = handle;
-    _nodeIdentifier = previousNode ? previousNode.nodeIdentifier : OSAtomicIncrement32(&nextGlobalIdentifier);
-    // Set the link between the tree node and the scope handle.
-    [handle setTreeNode:self];
-  }
-  return self;
-}
-
-// Non-Render initializer
-- (instancetype)initWithComponent:(id<CKTreeNodeComponentProtocol>)component
-                           parent:(id<CKTreeNodeWithChildrenProtocol>)parent
-                   previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
-                        scopeRoot:(CKComponentScopeRoot *)scopeRoot
-                     stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-{
-  auto const componentKey = [parent createComponentKeyForChildWithClass:[component class] identifier:nil];
-  auto const previousNode = [previousParent childForComponentKey:componentKey];
-  // For non-render components, the scope handle will be aquired from the component's base initializer.
-  if (self = [self initWithPreviousNode:previousNode handle:component.scopeHandle]) {
-    _component = component;
-    _componentKey = componentKey;
-    // Set the link between the parent and the child.
-    [parent setChild:self forComponentKey:_componentKey];
-    // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
-    scopeRoot.rootNode.registerNode(self, parent);
-#if DEBUG
-    [component acquireTreeNode:self];
-#endif
+    _scopeHandle = scopeHandle;
+    _nodeIdentifier = previousNode ? previousNode.nodeIdentifier : atomic_fetch_add_explicit(&nextGlobalIdentifier, 1, memory_order_relaxed);
   }
   return self;
 }
 
 // Render initializer
-- (instancetype)initWithRenderComponent:(id<CKRenderComponentProtocol>)component
-                                 parent:(id<CKTreeNodeWithChildrenProtocol>)parent
-                         previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
-                              scopeRoot:(CKComponentScopeRoot *)scopeRoot
-                           stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
+- (instancetype)initWithComponent:(id<CKRenderComponentProtocol>)component
+                           parent:(id<CKTreeNodeWithChildrenProtocol>)parent
+                   previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
+                        scopeRoot:(CKComponentScopeRoot *)scopeRoot
+                     stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
 {
   Class componentClass = [component class];
   auto const componentKey = [parent createComponentKeyForChildWithClass:componentClass identifier:[component componentIdentifier]];
   auto const previousNode = [previousParent childForComponentKey:componentKey];
 
   // For Render Layout components, the component might have a scope handle already.
-  CKComponentScopeHandle *handle = component.scopeHandle;
-  if (handle == nil) {
-    // If there is a previous node, we just duplicate the scope handle.
-    if (previousNode) {
-      handle = [previousNode.handle newHandleWithStateUpdates:stateUpdates
-                                           componentScopeRoot:scopeRoot];
-    } else {
-      // The component needs a scope handle in few cases:
-      // 1. Has an initial state
-      // 2. Has a controller
-      // 3. Returns `YES` from `requiresScopeHandle`
-      id initialState = [componentClass initialStateWithComponent:component];
-      if (initialState != [CKTreeNodeEmptyState emptyState] ||
-          [componentClass controllerClass] ||
-          [componentClass requiresScopeHandle]) {
-        handle = [[CKComponentScopeHandle alloc] initWithListener:scopeRoot.listener
-                                                   rootIdentifier:scopeRoot.globalIdentifier
-                                                   componentClass:componentClass
-                                                     initialState:initialState];
-      }
-    }
-
-    // Finalize the node/scope regsitration.
-    if (handle) {
-      [component acquireScopeHandle:handle];
-      [scopeRoot registerComponent:component];
-      [handle resolve];
-    }
+  CKComponentScopeHandle *scopeHandle = component.scopeHandle;
+  if (scopeHandle == nil) {
+    scopeHandle = CKRender::ScopeHandle::Render::create(component, componentClass, previousNode, scopeRoot, stateUpdates);
   }
 
-  if (self = [self initWithPreviousNode:previousNode handle:component.scopeHandle]) {
+  if (self = [self initWithPreviousNode:previousNode scopeHandle:scopeHandle]) {
     _component = component;
     _componentKey = componentKey;
     // Set the link between the parent and the child.
     [parent setChild:self forComponentKey:_componentKey];
     // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
     scopeRoot.rootNode.registerNode(self, parent);
+    // Set the link between the tree node and the scope handle.
+    [scopeHandle setTreeNode:self];
 #if DEBUG
     [component acquireTreeNode:self];
 #endif
@@ -129,7 +82,8 @@
 
 - (void)linkComponent:(id<CKTreeNodeComponentProtocol>)component
              toParent:(id<CKTreeNodeWithChildrenProtocol>)parent
-            scopeRoot:(CKComponentScopeRoot *)scopeRoot
+       previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
+               params:(const CKBuildComponentTreeParams &)params
 {
   auto const componentKey = [parent createComponentKeyForChildWithClass:[component class] identifier:nil];
   _component = component;
@@ -137,7 +91,7 @@
   // Set the link between the parent and the child.
   [parent setChild:self forComponentKey:_componentKey];
   // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
-  scopeRoot.rootNode.registerNode(self, parent);
+  params.scopeRoot.rootNode.registerNode(self, parent);
 #if DEBUG
   [component acquireTreeNode:self];
 #endif
@@ -145,7 +99,7 @@
 
 - (id)state
 {
-  return _handle.state;
+  return _scopeHandle.state;
 }
 
 - (const CKTreeNodeComponentKey &)componentKey
@@ -158,10 +112,10 @@
   auto const parent = previousScopeRoot.rootNode.parentForNodeIdentifier(_nodeIdentifier);
   CKAssert(parent != nil, @"The parent cannot be nil; every node should have a valid parent.");
   scopeRoot.rootNode.registerNode(self, parent);
-  if (_handle) {
+  if (_scopeHandle) {
     // Register the reused comopnent in the new scope root.
     [scopeRoot registerComponent:_component];
-    auto const controller = _handle.controller;
+    auto const controller = _scopeHandle.controller;
     if (controller) {
       // Register the controller in the new scope root.
       [scopeRoot registerComponentController:controller];
@@ -187,17 +141,12 @@
 
 @end
 
-/**
- Implement a singletone empty state here.
- */
-@implementation CKTreeNodeEmptyState
-+ (id)emptyState
+id CKTreeNodeEmptyState(void)
 {
   static dispatch_once_t onceToken;
-  static CKTreeNodeEmptyState *emptyState;
+  static id emptyState;
   dispatch_once(&onceToken, ^{
-    emptyState = [CKTreeNodeEmptyState new];
+    emptyState = [NSObject new];
   });
   return emptyState;
 }
-@end

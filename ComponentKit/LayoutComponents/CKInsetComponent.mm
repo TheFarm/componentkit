@@ -14,9 +14,10 @@
 #import <ComponentKit/CKMacros.h>
 #import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKComponentPerfScope.h>
+#import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKSizeAssert.h>
 
 #import "CKComponentSubclass.h"
-#import "CKInternalHelpers.h"
 #import "ComponentLayoutContext.h"
 
 @interface CKInsetComponent ()
@@ -72,11 +73,6 @@ static CGFloat centerInset(CGFloat outer, CGFloat inner)
   CK_NOT_DESIGNATED_INITIALIZER();
 }
 
-- (CKComponent *)render:(id)state
-{
-  return _component;
-}
-
 /**
  Inset will compute a new constrained size for it's child after applying insets and re-positioning
  the child to respect the inset.
@@ -107,6 +103,7 @@ static CGFloat centerInset(CGFloat outer, CGFloat inner)
       MAX(0, constrainedSize.max.height - insetsY),
     }
   };
+  CKAssertSizeRange(insetConstrainedSize);
   const CGSize insetParentSize = {
     MAX(0, parentSize.width - insetsX),
     MAX(0, parentSize.height - insetsY)
@@ -131,7 +128,19 @@ static CGFloat centerInset(CGFloat outer, CGFloat inner)
                            constrainedSize.max.height -
                            (finite(_insets.bottom,
                                    centerInset(constrainedSize.max.height, childLayout.size.height)) + childLayout.size.height));
-  return {self, computedSize, {{{x,y}, childLayout}}};
+  return {self, computedSize, {{{x,y}, std::move(childLayout)}}};
+}
+
+#pragma mark - CKMountable
+
+- (unsigned int)numberOfChildren
+{
+  return CKIterable::numberOfChildren(_component);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _component);
 }
 
 @end

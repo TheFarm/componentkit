@@ -13,10 +13,11 @@
 #import <UIKit/UICollectionView.h>
 #import <UIKit/UITableView.h>
 
-#import "CKEqualityHashHelpers.h"
+#import <ComponentKit/CKEqualityHelpers.h>
+#import <ComponentKit/CKMacros.h>
+#import <ComponentKit/CKAssert.h>
+
 #import "CKIndexSetDescription.h"
-#import "CKMacros.h"
-#import "CKAssert.h"
 
 @implementation CKDataSourceChangeset
 
@@ -66,7 +67,7 @@
     [_removedSections isEqualToIndexSet:obj.removedSections] &&
     [_movedItems isEqualToDictionary:obj.movedItems] &&
     [_insertedSections isEqualToIndexSet:obj.insertedSections] &&
-    [_insertedItems isEqual:obj.insertedItems];
+    [_insertedItems isEqualToDictionary:obj.insertedItems];
   }
 }
 
@@ -121,7 +122,7 @@ namespace CK {
     return s.length > 0 ? [s stringByAppendingString:@"\n"] : @"";
   }
 
-  static auto itemsByIndexPathDescription(NSDictionary<NSIndexPath *, NSObject *> * const items, NSString * const title) -> NSString *
+  auto itemsByIndexPathDescription(NSDictionary<NSIndexPath *, NSObject *> * const items, NSString * const title) -> NSString *
   {
     if (items.count == 0) {
       return @"";

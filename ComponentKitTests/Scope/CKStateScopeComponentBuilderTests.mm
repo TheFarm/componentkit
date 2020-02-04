@@ -18,9 +18,9 @@
 #import <ComponentKit/CKCompositeComponent.h>
 #import <ComponentKit/CKComponentScope.h>
 #import <ComponentKit/CKComponentInternal.h>
-#import <ComponentKit/CKComponentScopeFrame.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
+#import <ComponentKit/CKRootTreeNode.h>
 #import <ComponentKit/CKThreadLocalComponentScope.h>
 
 #import "CKStateExposingComponent.h"
@@ -61,7 +61,7 @@
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
 
   CKComponent *(^block)(void) = ^CKComponent *{
-    XCTAssertEqualObjects(CKThreadLocalComponentScope::currentScope()->stack.top().previousFrame, root.rootFrame);
+    XCTAssertEqualObjects(CKThreadLocalComponentScope::currentScope()->stack.top().previousFrame, root.rootNode.node());
     return [CKComponent new];
   };
 
@@ -116,7 +116,7 @@
   XCTAssertEqualObjects(component.state, [CKStateExposingComponent initialState]);
 }
 
-- (void)testStateScopeFrameIsNotFoundForComponentWhenClassNamesDoNotMatch
+- (void)testStatUniqueIdentifierIsNotFoundForComponentWhenClassNamesDoNotMatch
 {
   id state = @12345;
 
@@ -128,10 +128,10 @@
   };
 
   CKComponent *component = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, block).component;
-  XCTAssertNil(component.scopeFrameToken);
+  XCTAssertNil(component.uniqueIdentifier);
 }
 
-- (void)testStateScopeFrameIsNotFoundWhenAnotherComponentInTheSameScopeAcquiresItFirst
+- (void)testStateUniqueIdentifierIsNotFoundWhenAnotherComponentInTheSameScopeAcquiresItFirst
 {
   CKComponent __block *innerComponent = nil;
 
@@ -147,8 +147,8 @@
   };
 
   CKComponent *outerComponent = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, block).component;
-  XCTAssertNotNil(innerComponent.scopeFrameToken);
-  XCTAssertNil(outerComponent.scopeFrameToken);
+  XCTAssertNotNil(innerComponent.uniqueIdentifier);
+  XCTAssertNil(outerComponent.uniqueIdentifier);
 }
 
 @end

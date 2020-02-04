@@ -10,26 +10,19 @@
 
 #import "CKRenderComponent.h"
 
+#import <ComponentKit/CKGlobalConfig.h>
+#import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKMutex.h>
+
 #import "CKBuildComponent.h"
 #import "CKComponentInternal.h"
-#import "CKRenderComponentInternal.h"
 #import "CKComponentSubclass.h"
-#import "CKInternalHelpers.h"
 #import "CKRenderHelpers.h"
 #import "CKTreeNode.h"
-#import "CKGlobalConfig.h"
-
-struct CKRenderLayoutCache {
-  CKSizeRange constrainedSize;
-  CGSize parentSize;
-  CKComponentLayout childLayout;
-};
 
 @implementation CKRenderComponent
 {
-  CKComponent *_childComponent;
-  std::shared_ptr<CKRenderLayoutCache> _cachedLayout;
-  BOOL _enableLayoutCache;
+  CKComponent *_child;
 }
 
 #if DEBUG
@@ -38,11 +31,11 @@ struct CKRenderLayoutCache {
   if (self != [CKRenderComponent class]) {
     CKAssert(!CKSubclassOverridesInstanceMethod([CKRenderComponent class], self, @selector(computeLayoutThatFits:)),
              @"%@ overrides -computeLayoutThatFits: which is not allowed. "
-             "Consider subclassing CKRenderWithChildrenComponent directly if you need to perform custom layout.",
+             "Consider subclassing CKLayoutComponent directly if you need to perform custom layout.",
              self);
     CKAssert(!CKSubclassOverridesInstanceMethod([CKRenderComponent class], self, @selector(layoutThatFits:parentSize:)),
              @"%@ overrides -layoutThatFits:parentSize: which is not allowed. "
-             "Consider subclassing CKRenderWithChildrenComponent directly if you need to perform custom layout.",
+             "Consider subclassing CKLayoutComponent directly if you need to perform custom layout.",
              self);
   }
 }
@@ -66,21 +59,12 @@ struct CKRenderLayoutCache {
 }
 
 - (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
-            previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
+            previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                     params:(const CKBuildComponentTreeParams &)params
       parentHasStateUpdate:(BOOL)parentHasStateUpdate
 {
-  // Layout cache feature.
-  _enableLayoutCache = params.enableLayoutCache;
-  CKRenderDidReuseComponentBlock didReuseBlock = nil;
-  if (_enableLayoutCache) {
-    didReuseBlock =^(id<CKRenderComponentProtocol> reusedComponent){
-      CKRenderComponent *c = (CKRenderComponent *)reusedComponent;
-      self->_cachedLayout = c->_cachedLayout;
-    };
-  }
   // Build the component tree.
-  auto const node = CKRender::buildComponentTreeWithChild(self, &_childComponent, parent, previousParent, params, parentHasStateUpdate, NO, didReuseBlock);
+  auto const node = CKRender::ComponentTree::Render::build(self, &_child, parent, previousParent, params, parentHasStateUpdate, nil);
   auto const viewConfiguration = [self viewConfigurationWithState:node.state];
   if (!viewConfiguration.isDefaultConfiguration()) {
     [self setViewConfiguration:viewConfiguration];
@@ -93,34 +77,18 @@ struct CKRenderLayoutCache {
 {
   CKAssert(size == CKComponentSize(),
            @"CKRenderComponent only passes size {} to the super class initializer, but received size %@ "
-           "(component=%@)", size.description(), _childComponent);
+           "(component=%@)", size.description(), _child);
 
-  if (_childComponent) {
-    CKComponentLayout l;
-    if (_enableLayoutCache) {
-      if (_cachedLayout != nullptr &&
-          CGSizeEqualToSize(parentSize, _cachedLayout->parentSize) &&
-          constrainedSize == _cachedLayout->constrainedSize) {
-        l = _cachedLayout->childLayout;
-      } else {
-        l = [_childComponent layoutThatFits:constrainedSize parentSize:parentSize];
-        _cachedLayout = std::make_shared<CKRenderLayoutCache>(CKRenderLayoutCache{
-          .constrainedSize = constrainedSize,
-          .parentSize = parentSize,
-          .childLayout = l,
-        });
-      }
-    } else {
-      l = [_childComponent layoutThatFits:constrainedSize parentSize:parentSize];
-    }
+  if (_child) {
+    CKComponentLayout l = [_child layoutThatFits:constrainedSize parentSize:parentSize];
     return {self, l.size, {{{0,0}, l}}};
   }
   return [super computeLayoutThatFits:constrainedSize restrictedToSize:size relativeToParentSize:parentSize];
 }
 
-- (CKComponent *)childComponent
+- (CKComponent *)child
 {
-  return _childComponent;
+  return _child;
 }
 
 #pragma mark - CKRenderComponentProtocol
@@ -132,7 +100,7 @@ struct CKRenderLayoutCache {
 
 + (id)initialState
 {
-  return [CKTreeNodeEmptyState emptyState];
+  return CKTreeNodeEmptyState();
 }
 
 - (BOOL)shouldComponentUpdate:(id<CKRenderComponentProtocol>)component
@@ -147,9 +115,31 @@ struct CKRenderLayoutCache {
   return {};
 }
 
-- (id)componentIdentifier
+- (id _Nullable)componentIdentifier
 {
   return nil;
+}
+
++ (BOOL)requiresScopeHandle
+{
+  const Class componentClass = self;
+
+  static CK::StaticMutex mutex = CK_MUTEX_INITIALIZER; // protects cache
+  CK::StaticMutexLocker l(mutex);
+
+  static std::unordered_map<Class, BOOL> *cache = new std::unordered_map<Class, BOOL>();
+  const auto &it = cache->find(componentClass);
+  if (it == cache->end()) {
+    BOOL hasAnimations = NO;
+    if (CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsFromPreviousComponent:)) ||
+        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnInitialMount)) ||
+        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnFinalUnmount))) {
+      hasAnimations = YES;
+    }
+    cache->insert({componentClass, hasAnimations});
+    return hasAnimations;
+  }
+  return it->second;
 }
 
 @end

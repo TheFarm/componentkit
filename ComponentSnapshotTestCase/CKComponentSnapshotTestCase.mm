@@ -19,9 +19,6 @@
 static CKComponent *(^_componentBlock)();
 static CKComponent *_leakyComponent;
 
-@interface CKComponentSnapshotTestCase () <CKComponentProvider>
-@end
-
 @implementation CKComponentSnapshotTestCase
 
 - (BOOL)compareSnapshotOfComponent:(CKComponent *)component
@@ -31,7 +28,7 @@ static CKComponent *_leakyComponent;
                              error:(NSError **)errorPtr
 {
   const CKComponentLayout componentLayout = [component layoutThatFits:sizeRange parentSize:sizeRange.max];
-  CKComponentLifecycleTestHelper *componentLifecycleTestController = [[CKComponentLifecycleTestHelper alloc] initWithComponentProvider:nil
+  CKComponentLifecycleTestHelper *componentLifecycleTestController = [[CKComponentLifecycleTestHelper alloc] initWithComponentProvider:nullptr
                                                                                                                              sizeRangeProvider:nil];
   [componentLifecycleTestController updateWithState:(CKComponentLifecycleTestHelperState){
     .componentLayout = componentLayout
@@ -54,20 +51,21 @@ static CKComponent *_leakyComponent;
                                   error:(NSError **)errorPtr;
 {
   _componentBlock = componentBlock;
-  CKComponentLifecycleTestHelper *componentLifecycleTestController = [[CKComponentLifecycleTestHelper alloc] initWithComponentProvider:[self class]
+  CKComponentLifecycleTestHelper *componentLifecycleTestController = [[CKComponentLifecycleTestHelper alloc] initWithComponentProvider:componentProvider
                                                                                                                              sizeRangeProvider:nil];
   [componentLifecycleTestController updateWithState:[componentLifecycleTestController prepareForUpdateWithModel:nil
                                                                                                 constrainedSize:sizeRange
                                                                                                         context:nil]];
   [_leakyComponent updateState:updateStackBlock mode:CKUpdateModeSynchronous];
-  return [self compareSnapshotOfComponent:[componentLifecycleTestController state].componentLayout.component
+  CKComponent *component = (CKComponent *)[componentLifecycleTestController state].componentLayout.component;
+  return [self compareSnapshotOfComponent:component
                                 sizeRange:sizeRange
                  referenceImagesDirectory:referenceImagesDirectory
                                identifier:identifier
                                     error:errorPtr];
 }
 
-+ (CKComponent *)componentForModel:(id<NSObject>)model context:(id<NSObject>)context
+static CKComponent *componentProvider(id<NSObject> model, id<NSObject>context)
 {
   _leakyComponent = _componentBlock();
   return _leakyComponent;

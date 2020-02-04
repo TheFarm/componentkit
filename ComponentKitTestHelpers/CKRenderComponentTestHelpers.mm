@@ -21,6 +21,7 @@
 @implementation CKTestRenderComponent
 {
   BOOL _shouldUseComponentContext;
+  BOOL _shouldUseNonRenderChild;
 }
 
 + (instancetype)newWithProps:(const CKTestRenderComponentProps &)props
@@ -29,6 +30,7 @@
   if (c) {
     c->_identifier = props.identifier;
     c->_shouldUseComponentContext = props.shouldUseComponentContext;
+    c->_shouldUseNonRenderChild = props.shouldUseNonRenderChild;
   }
   return c;
 }
@@ -37,6 +39,16 @@
 {
   CKComponentMutableContext<NSNumber> context(@1);
   _renderCalledCounter++;
+  if (_shouldUseNonRenderChild) {
+    _nonRenderChildComponent = [CKCompositeComponentWithScopeAndState
+                                newWithComponent:
+                                [CKCompositeComponentWithScopeAndState
+                                 newWithComponent:
+                                [CKCompositeComponentWithScopeAndState
+                                 newWithComponent:
+                                CK::ComponentBuilder().build()]]];
+    return _nonRenderChildComponent;
+  }
   _childComponent = [CKTestChildRenderComponent newWithProps:{
     .shouldUseComponentContext = _shouldUseComponentContext,
   }];
@@ -57,6 +69,8 @@
 {
   _didReuseComponent = YES;
   _childComponent = component->_childComponent;
+  _nonRenderChildComponent = component->_nonRenderChildComponent;
+  _shouldUseNonRenderChild = component->_shouldUseNonRenderChild;
 }
 
 @end
@@ -93,7 +107,7 @@
 }
 
 - (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
-            previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
+            previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                     params:(const CKBuildComponentTreeParams &)params
       parentHasStateUpdate:(BOOL)parentHasStateUpdate
 {
@@ -112,19 +126,36 @@
 @end
 
 @implementation CKCompositeComponentWithScopeAndState
+{
+  CKComponent *_child;
+}
 + (instancetype)newWithComponent:(CKComponent *)component
 {
   CKComponentScope scope(self);
-  return [super newWithComponent:component];
+  auto const c = [super newWithComponent:component];
+  if (c) {
+    c->_child = component;
+  }
+  return c;
 }
 
 + (id)initialState
 {
   return @1;
 }
+
+- (CKComponent *)child
+{
+  return _child;
+}
 @end
 
 @implementation CKTestRenderWithNonRenderWithStateChildComponent
++ (id)initialState
+{
+  return @1;
+}
+
 - (CKComponent *)render:(id)state
 {
   _childComponent = [CKCompositeComponentWithScopeAndState
@@ -139,7 +170,7 @@
 }
 @end
 
-@implementation CKTestRenderWithChildrenComponent
+@implementation CKTestLayoutComponent
 {
   std::vector<CKComponent *> _children;
 }
@@ -151,15 +182,28 @@
   }
   return c;
 }
-+ (BOOL)requiresScopeHandle
+- (unsigned int)numberOfChildren
 {
-  return YES;
+  return (unsigned int)_children.size();
 }
-- (std::vector<CKComponent *>)renderChildren:(id)state
+- (id<CKMountable>)childAtIndex:(unsigned int)index
 {
-  return _children;
+  if (index < _children.size()) {
+    return _children[index];
+  }
+  CKFailAssertWithCategory([self class], @"Index %u is out of bounds %lu", index, _children.size());
+  return nil;
 }
 @end
 
 @implementation CKTestChildRenderComponentController
+@end
+
+@implementation CKCompositeComponentWithScope
+
++ (instancetype)newWithComponentProvider:(CKComponent *(^)())componentProvider
+{
+  CKComponentScope scope(self);
+  return [super newWithComponent:componentProvider()];
+}
 @end

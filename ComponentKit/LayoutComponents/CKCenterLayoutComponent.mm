@@ -11,8 +11,8 @@
 #import "CKCenterLayoutComponent.h"
 
 #import <ComponentKit/CKComponentPerfScope.h>
+#import <ComponentKit/CKInternalHelpers.h>
 
-#import "CKInternalHelpers.h"
 #import "CKComponentSubclass.h"
 #import "ComponentUtilities.h"
 
@@ -36,11 +36,6 @@
     c->_child = child;
   }
   return c;
-}
-
-- (CKComponent *)render:(id)state
-{
-  return _child;
 }
 
 - (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
@@ -82,6 +77,18 @@
   };
 
   return {self, size, {{childPosition, childLayout}}};
+}
+
+#pragma mark - CKMountable
+
+- (unsigned int)numberOfChildren
+{
+  return CKIterable::numberOfChildren(_child);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _child);
 }
 
 @end

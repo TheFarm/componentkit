@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 #import <UIKit/UIView.h>
 
@@ -18,7 +22,7 @@
  * This will cause the layout referenced by `scopeIdentifier` to be unmounted when `cell` is deallocated.
  * This is useful for collection views, whose cell views are managed by UIKit: usually they are re-used,
  * but sometimes they are deallocated. At that point, the object graph looks like this:
- 
+
                                              Cell view
                                               |
                                               |
@@ -42,3 +46,5 @@
  * and all the View <--> Component links to be broken and the whole structure to be freed.
  */
 void CKSetupDeallocUnmounter(UIView *cell, CKComponentScopeRootIdentifier scopeIdentifier, CKComponentAttachController *attachController);
+
+#endif

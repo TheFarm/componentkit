@@ -10,14 +10,13 @@
 
 #import <XCTest/XCTest.h>
 
-#import "CKComponentController.h"
-#import "CKBuildComponent.h"
-#import "CKComponentInternal.h"
-#import "CKComponentSubclass.h"
-#import "CKComponentScopeHandle.h"
-#import "CKThreadLocalComponentScope.h"
-#import "CKFlexboxComponent.h"
-
+#import <ComponentKit/CKComponentController.h>
+#import <ComponentKit/CKBuildComponent.h>
+#import <ComponentKit/CKComponentInternal.h>
+#import <ComponentKit/CKComponentSubclass.h>
+#import <ComponentKit/CKComponentScopeHandle.h>
+#import <ComponentKit/CKThreadLocalComponentScope.h>
+#import <ComponentKit/CKFlexboxComponent.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
 
 @interface TestScopeIntegrationComponent : CKComponent
@@ -43,14 +42,10 @@
   auto const c = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
     component1 = [TestScopeIntegrationComponent newWithIdentifier:nil title:state1];
     component2 = [TestScopeIntegrationComponent newWithIdentifier:nil title:state2];
-    return [CKFlexboxComponent
-            newWithView:{}
-            size:{}
-            style:{}
-            children:{
-              {component1},
-              {component2},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .child(component1)
+               .child(component2)
+               .build();
   });
 
   [self verifyComponentsHasCorrectStateAndController:component1 component2:component2 state1:state1 state2:state2];
@@ -67,14 +62,10 @@
   auto const c = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
     component1 = [TestScopeIntegrationComponent newWithIdentifier:@"1" title:state1];
     component2 = [TestScopeIntegrationComponent newWithIdentifier:@"1" title:state2];
-    return [CKFlexboxComponent
-            newWithView:{}
-            size:{}
-            style:{}
-            children:{
-              {component1},
-              {component2},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .child(component1)
+               .child(component2)
+               .build();
   });
 
   [self verifyComponentsHasCorrectStateAndController:component1 component2:component2 state1:state1 state2:state2];
@@ -91,14 +82,10 @@
   auto const c = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
     component1 = [TestScopeIntegrationComponent newWithIdentifier:@"1" title:state1];
     component2 = [TestScopeIntegrationComponent newWithIdentifier:@"2" title:state2];
-    return [CKFlexboxComponent
-            newWithView:{}
-            size:{}
-            style:{}
-            children:{
-              {component1},
-              {component2},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .child(component1)
+               .child(component2)
+               .build();
   });
 
   [self verifyComponentsHasCorrectStateAndController:component1 component2:component2 state1:state1 state2:state2];

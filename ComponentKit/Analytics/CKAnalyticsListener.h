@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 #import <ComponentKit/CKBuildComponent.h>
 #import <ComponentKit/CKComponentScopeTypes.h>
@@ -16,22 +20,11 @@
 #import <ComponentKit/CKTreeNodeProtocol.h>
 #import <ComponentKit/CKSystraceListener.h>
 
+@protocol CKMountable;
 @protocol CKTreeNodeProtocol;
 
 @class CKComponent;
 @class CKComponentScopeRoot;
-
-@protocol CKDebugAnalyticsListener <NSObject>
-
-/**
- Will be called for every component with pre-computed child (CKCompositeComponent for example) during the component tree creation.
- */
-- (void)didBuildComponentTreeWithPrecomputedChild:(id<CKTreeNodeComponentProtocol>)component
-                                             node:(id<CKTreeNodeProtocol>)node
-                                           parent:(id<CKTreeNodeWithChildrenProtocol>)parent
-                                           params:(const CKBuildComponentTreeParams &)params
-                             parentHasStateUpdate:(BOOL)parentHasStateUpdate;
-@end
 
 /**
  This protocol is being used by the infrastructure to collect data about the component tree life cycle.
@@ -44,10 +37,12 @@
  @param scopRoot Scope root for component tree. Use that to identify tree between will/didBuild.
  @param buildTrigger The build trigger (new tree, state update, props updates) for this component tree creation.
  @param stateUpdates The state updates map for the component tree creation.
+ @param enableComponentReuseOptimizations If `NO` any optimization for component reuse is turned off.
  */
 - (void)willBuildComponentTreeWithScopeRoot:(CKComponentScopeRoot *)scopeRoot
-                               buildTrigger:(BuildTrigger)buildTrigger
-                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates;
+                               buildTrigger:(CKBuildTrigger)buildTrigger
+                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
+          enableComponentReuseOptimizations:(BOOL)enableComponentReuseOptimizations;
 
 /**
  Called after the component tree creation.
@@ -56,11 +51,13 @@
  @param buildTrigger The build trigger (new tree, state update, props updates) for this component tree creation.
  @param stateUpdates The state updates map for the component tree creation.
  @param component Root component for created tree
+ @param enableComponentReuseOptimizations If `NO` any optimization for component reuse is turned off.
  */
 - (void)didBuildComponentTreeWithScopeRoot:(CKComponentScopeRoot *)scopeRoot
-                              buildTrigger:(BuildTrigger)buildTrigger
+                              buildTrigger:(CKBuildTrigger)buildTrigger
                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-                                 component:(CKComponent *)component;
+                                 component:(CKComponent *)component
+         enableComponentReuseOptimizations:(BOOL)enableComponentReuseOptimizations;
 
 /**
  Called before component tree layout.
@@ -76,7 +73,7 @@
  ThreadB, didLayout Component1
  To identify matching will/didLayout events between callbacks, please use Thread id and Component id
  */
-- (void)willLayoutComponentTreeWithRootComponent:(CKComponent *)component buildTrigger:(CK::Optional<BuildTrigger>)buildTrigger;
+- (void)willLayoutComponentTreeWithRootComponent:(id<CKMountable>)component buildTrigger:(CK::Optional<CKBuildTrigger>)buildTrigger;
 
 /**
  Called after component tree layout.
@@ -90,7 +87,7 @@
  ThreadB, didLayout Component1
  To identify matching will/didLayout events between callbacks, please use Thread id and Component id
 */
-- (void)didLayoutComponentTreeWithRootComponent:(CKComponent *)component;
+- (void)didLayoutComponentTreeWithRootComponent:(id<CKMountable>)component;
 
 /**
  Called before/after mounting a component tree
@@ -98,9 +95,9 @@
  @param component Root component for mounted tree
  */
 
-- (void)willMountComponentTreeWithRootComponent:(CKComponent *)component;
-- (void)didMountComponentTreeWithRootComponent:(CKComponent *)component
-                         mountAnalyticsContext:(CK::Component::MountAnalyticsContext *)mountAnalyticsContext;
+- (void)willMountComponentTreeWithRootComponent:(id<CKMountable>)component;
+- (void)didMountComponentTreeWithRootComponent:(id<CKMountable>)component
+                         mountAnalyticsContext:(CK::Optional<CK::Component::MountAnalyticsContext>)mountAnalyticsContext;
 
 /**
  Called before mounting a component tree.
@@ -108,15 +105,15 @@
  If returns YES, an extra information will be collected during the mount process.
  The extra information will be provided back in `didMountComponentTreeWithRootComponent` callback.
  */
-- (BOOL)shouldCollectMountInformationForRootComponent:(CKComponent *)component;
+- (BOOL)shouldCollectMountInformationForRootComponent:(id<CKMountable>)component;
 
 /**
  Called before/after collecting animations from a component tree.
 
  @param component Root component for the tree that is about to be mounted.
  */
-- (void)willCollectAnimationsFromComponentTreeWithRootComponent:(CKComponent *)component;
-- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(CKComponent *)component;
+- (void)willCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component;
+- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component;
 
 /** Render Components **/
 
@@ -138,8 +135,19 @@ fromPreviousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot;
 - (id<CKSystraceListener>)systraceListener;
 
 /**
- Provides a debug analytics listener listener. Can be nil.
+ If returns true, `didBuildTreeNodeForPrecomputedChild` will be called for non-render component during the component tree creation.
  */
-- (id<CKDebugAnalyticsListener>)debugAnalyticsListener;
+- (BOOL)shouldCollectTreeNodeCreationInformation:(CKComponentScopeRoot *)scopeRoot;
+
+/**
+ Will be called for every component with pre-computed child (CKCompositeComponent for example) during the component tree creation.
+ */
+- (void)didBuildTreeNodeForPrecomputedChild:(id<CKTreeNodeComponentProtocol>)component
+                                       node:(id<CKTreeNodeProtocol>)node
+                                     parent:(id<CKTreeNodeWithChildrenProtocol>)parent
+                                     params:(const CKBuildComponentTreeParams &)params
+                       parentHasStateUpdate:(BOOL)parentHasStateUpdate;
 
 @end
+
+#endif

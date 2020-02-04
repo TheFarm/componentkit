@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentScopeTypes.h>
@@ -15,6 +19,7 @@
 #import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKTreeNodeProtocol.h>
 
+@protocol CKRenderComponentProtocol;
 
 /**
  This object represents a node in the component tree.
@@ -23,24 +28,21 @@
 
  CKTreeNode is the base class of a tree node. It will be attached non-render components (CKComponent & CKCompositeComponent).
  */
-@interface CKTreeNode: NSObject <CKTreeNodeProtocol>
+@interface CKTreeNode : NSObject <CKTreeNodeProtocol>
 
 /** Base initializer */
 - (instancetype)initWithPreviousNode:(id<CKTreeNodeProtocol>)previousNode
-                              handle:(CKComponentScopeHandle *)handle;
+                         scopeHandle:(CKComponentScopeHandle *)scopeHandle;
 
-/** Non-render initializer. */
-- (instancetype)initWithComponent:(id<CKTreeNodeComponentProtocol>)component
+/** Render initializer */
+- (instancetype)initWithComponent:(id<CKRenderComponentProtocol>)component
                            parent:(id<CKTreeNodeWithChildrenProtocol>)parent
                    previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
                         scopeRoot:(CKComponentScopeRoot *)scopeRoot
                      stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates;
 
-/** Render initializer. */
-- (instancetype)initWithRenderComponent:(id<CKRenderComponentProtocol>)component
-                                 parent:(id<CKTreeNodeWithChildrenProtocol>)parent
-                         previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
-                              scopeRoot:(CKComponentScopeRoot *)scopeRoot
-                           stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates;
+@property (nonatomic, strong, readonly) CKComponentScopeHandle *scopeHandle;
 
 @end
+
+#endif

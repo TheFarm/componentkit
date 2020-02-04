@@ -14,6 +14,8 @@
 #import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKComponentLayout.h>
 #import <ComponentKit/CKComponentSubclass.h>
+#import <ComponentKit/CKMountController.h>
+#import <ComponentKit/CKMountedObjectForView.h>
 
 @interface CKComponentMountTests : XCTestCase
 @end
@@ -26,7 +28,9 @@
 
 - (void)testThatMountingComponentThatReturnsMountChildrenNoDoesNotMountItsChild
 {
-  CKComponent *viewComponent = [CKComponent newWithView:{[UIView class]} size:{}];
+  CKComponent *viewComponent = CK::ComponentBuilder()
+                                   .viewClass([UIView class])
+                                   .build();
   CKComponent *c = [CKDontMountChildrenComponent newWithChild:viewComponent];
 
   CKComponentLayout layout = [c layoutThatFits:{} parentSize:{NAN, NAN}];
@@ -45,7 +49,9 @@
 
 - (void)testMountingComponentAffectsResponderChain
 {
-  CKComponent *c = [CKComponent newWithView:{[UIView class]} size:{}];
+  CKComponent *c = CK::ComponentBuilder()
+                       .viewClass([UIView class])
+                       .build();
   CKComponentLayout layout = [c layoutThatFits:{} parentSize:{NAN, NAN}];
 
   UIView *container = [UIView new];
@@ -58,8 +64,12 @@
 
 - (void)testUnmounting
 {
-  CKComponent *a = [CKComponent newWithView:{[UIView class]} size:{}];
-  CKComponent *b = [CKComponent newWithView:{[UIView class]} size:{}];
+  CKComponent *a = CK::ComponentBuilder()
+                       .viewClass([UIView class])
+                       .build();
+  CKComponent *b = CK::ComponentBuilder()
+                       .viewClass([UIView class])
+                       .build();
 
   const CKComponentLayout layoutBoth = {a, CGSizeZero,
     {
@@ -91,6 +101,32 @@
   XCTAssertNil(b.viewContext.view, @"Should not be mounted");
 }
 
+- (void)testMountController
+{
+  auto mountController = CK::MountController {};
+  const auto viewConfig = CKComponentViewConfiguration {
+    [UILabel class],
+    {{@selector(setText:), @"Hello"}}
+  };
+  const auto component = [CKComponent newWithView:viewConfig size:{}];
+  const auto view = [[UIView alloc] initWithFrame:CGRect {{0, 0}, {10, 10}}];
+  const auto context = CK::Component::MountContext::RootContext(view);
+  const auto children = std::make_shared<const std::vector<CKComponentLayoutChild>>(std::vector<CKComponentLayoutChild> {});
+
+  const auto result = mountController.mount(component, viewConfig, context, {5, 5}, children, nil);
+  const auto label = (UILabel *)view.subviews.firstObject;
+  XCTAssertTrue(result.mountChildren);
+  XCTAssertTrue(CGRectEqualToRect(label.frame, CGRect {{0, 0}, {5, 5}}));
+  XCTAssertTrue(CGRectEqualToRect(mountController.mountInfo()->viewContext.frame, CGRect {{0, 0}, {5, 5}}));
+  XCTAssertEqualObjects(label.text, @"Hello");
+  XCTAssertEqual(CKMountedObjectForView(label), component);
+  XCTAssertEqual(mountController.mountInfo()->view, label);
+  
+  mountController.unmount(component);
+  XCTAssertTrue(mountController.mountInfo() == nullptr);
+  XCTAssertNil(CKMountedObjectForView(label));
+}
+
 @end
 
 @implementation CKDontMountChildrenComponent
@@ -115,12 +151,11 @@
 }
 
 - (CK::Component::MountResult)mountInContext:(const CK::Component::MountContext &)context
-size:(const CGSize)size
-children:(std::shared_ptr<const std::vector<CKComponentLayoutChild>>)children
-supercomponent:(CKComponent *)supercomponent
-systraceListener:(id<CKSystraceListener>)systraceListener
+                                        size:(const CGSize)size
+                                    children:(std::shared_ptr<const std::vector<CKComponentLayoutChild>>)children
+                              supercomponent:(CKComponent *)supercomponent
 {
-  CK::Component::MountResult r = [super mountInContext:context size:size children:children supercomponent:supercomponent systraceListener:systraceListener];
+  CK::Component::MountResult r = [super mountInContext:context size:size children:children supercomponent:supercomponent];
   return {
     .mountChildren = NO,
     .contextForChildren = r.contextForChildren

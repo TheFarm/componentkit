@@ -20,17 +20,16 @@
 #import "CKRenderHelpers.h"
 #import "CKThreadLocalComponentScope.h"
 #import "CKTreeNodeProtocol.h"
-#import "CKTreeNodeWithChildren.h"
 #import "CKComponentCreationValidation.h"
 #import "CKScopeTreeNodeProtocol.h"
 
 namespace CKBuildComponentHelpers {
-  auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> BuildTrigger
+  auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> CKBuildTrigger
   {
-    if (scopeRoot.rootFrame.childrenSize > 0 || !scopeRoot.rootNode.isEmpty()) {
-      return (stateUpdates.size() > 0) ? BuildTrigger::StateUpdate : BuildTrigger::PropsUpdate;
+    if (!scopeRoot.rootNode.isEmpty()) {
+      return (stateUpdates.size() > 0) ? CKBuildTrigger::StateUpdate : CKBuildTrigger::PropsUpdate;
     }
-    return BuildTrigger::NewTree;
+    return CKBuildTrigger::NewTree;
   }
 
   /**
@@ -39,14 +38,14 @@ namespace CKBuildComponentHelpers {
   static auto boundsAnimationFromPreviousScopeRoot(CKComponentScopeRoot *newRoot,
                                                    CKComponentScopeRoot *previousRoot) -> CKComponentBoundsAnimation
   {
-    NSMapTable *const scopeFrameTokenToOldComponent = [NSMapTable strongToStrongObjectsMapTable];
+    NSMapTable *const uniqueIdentifierToOldComponent = [NSMapTable strongToStrongObjectsMapTable];
     [previousRoot
      enumerateComponentsMatchingPredicate:&CKComponentBoundsAnimationPredicate
      block:^(id<CKComponentProtocol> component) {
        CKComponent *oldComponent = (CKComponent *)component;
-       id scopeFrameToken = [oldComponent scopeFrameToken];
-       if (scopeFrameToken) {
-         [scopeFrameTokenToOldComponent setObject:oldComponent forKey:scopeFrameToken];
+       id uniqueIdentifier = [oldComponent uniqueIdentifier];
+       if (uniqueIdentifier) {
+         [uniqueIdentifierToOldComponent setObject:oldComponent forKey:uniqueIdentifier];
        }
      }];
 
@@ -55,9 +54,9 @@ namespace CKBuildComponentHelpers {
      enumerateComponentsMatchingPredicate:&CKComponentBoundsAnimationPredicate
      block:^(id<CKComponentProtocol> component) {
        CKComponent *newComponent = (CKComponent *)component;
-       id scopeFrameToken = [newComponent scopeFrameToken];
-       if (scopeFrameToken) {
-         CKComponent *oldComponent = [scopeFrameTokenToOldComponent objectForKey:scopeFrameToken];
+       id uniqueIdentifier = [newComponent uniqueIdentifier];
+       if (uniqueIdentifier) {
+         CKComponent *oldComponent = [uniqueIdentifierToOldComponent objectForKey:uniqueIdentifier];
          if (oldComponent) {
            auto const ba = [newComponent boundsAnimationFromPreviousComponent:oldComponent];
            if (ba.duration != 0) {
@@ -76,24 +75,23 @@ namespace CKBuildComponentHelpers {
 CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
                                         const CKComponentStateUpdateMap &stateUpdates,
                                         CKComponent *(^componentFactory)(void),
-                                        BOOL ignoreComponentReuseOptimizations,
-                                        CKUnifyComponentTreeConfig unifyComponentTreeConfig)
+                                        BOOL enableComponentReuseOptimizations)
 {
   CKCAssertNotNil(componentFactory, @"Must have component factory to build a component");
   auto const globalConfig = CKReadGlobalConfig();
-  
+
   auto const buildTrigger = CKBuildComponentHelpers::getBuildTrigger(previousRoot, stateUpdates);
   CKThreadLocalComponentScope threadScope(previousRoot,
                                           stateUpdates,
-                                          unifyComponentTreeConfig,
                                           buildTrigger);
 
   auto const analyticsListener = [previousRoot analyticsListener];
   [analyticsListener willBuildComponentTreeWithScopeRoot:previousRoot
                                             buildTrigger:buildTrigger
-                                            stateUpdates:stateUpdates];
+                                            stateUpdates:stateUpdates
+                       enableComponentReuseOptimizations:enableComponentReuseOptimizations];
 #if CK_ASSERTIONS_ENABLED
-  const CKComponentContext<CKComponentCreationValidationContext> validationContext([CKComponentCreationValidationContext new]);
+  const CKComponentContext<CKComponentCreationValidationContext> validationContext([[CKComponentCreationValidationContext alloc] initWithSource:CKComponentCreationValidationSourceBuild]);
 #endif
   auto const component = componentFactory();
 
@@ -105,19 +103,13 @@ CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
       .stateUpdates = stateUpdates,
       .treeNodeDirtyIds = CKRender::treeNodeDirtyIdsFor(previousRoot, stateUpdates, buildTrigger),
       .buildTrigger = buildTrigger,
-      .ignoreComponentReuseOptimizations = ignoreComponentReuseOptimizations,
+      .enableComponentReuseOptimizations = enableComponentReuseOptimizations,
       .systraceListener = threadScope.systraceListener,
-      .debugAnalyticsListener = analyticsListener.debugAnalyticsListener,
-      .enableLayoutCache = globalConfig.enableLayoutCacheInRender,
-      .unifyComponentTreeConfig = unifyComponentTreeConfig,
+      .shouldCollectTreeNodeCreationInformation = [analyticsListener shouldCollectTreeNodeCreationInformation:previousRoot],
     };
 
     // Build the component tree from the render function.
-    [component buildComponentTree:threadScope.newScopeRoot.rootNode.node()
-                   previousParent:previousRoot.rootNode.node()
-                           params:params
-             parentHasStateUpdate:NO];
-
+    CKRender::ComponentTree::Root::build(component, params);
   }
 
   CKComponentScopeRoot *newScopeRoot = threadScope.newScopeRoot;
@@ -125,7 +117,8 @@ CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
   [analyticsListener didBuildComponentTreeWithScopeRoot:newScopeRoot
                                            buildTrigger:buildTrigger
                                            stateUpdates:stateUpdates
-                                              component:component];
+                                              component:component
+                      enableComponentReuseOptimizations:enableComponentReuseOptimizations];
   return {
     .component = component,
     .scopeRoot = newScopeRoot,

@@ -8,10 +8,15 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKComponentLayout.h>
+#import <ComponentKit/CKMountable.h>
 
 @class CKDataSourceState;
 
@@ -22,9 +27,9 @@
  */
 BOOL CKComponentBoundsAnimationPredicate(id<CKComponentProtocol> component);
 
-auto CKComponentHasAnimationsOnInitialMountPredicate(id<CKComponentProtocol> const c) -> BOOL;
-auto CKComponentHasAnimationsFromPreviousComponentPredicate(id<CKComponentProtocol> const c) -> BOOL;
-auto CKComponentHasAnimationsOnFinalUnmountPredicate(id<CKComponentProtocol> const c) -> BOOL;
+auto CKComponentHasAnimationsOnInitialMountPredicate(id<CKMountable> const c) -> BOOL;
+auto CKComponentHasAnimationsFromPreviousComponentPredicate(id<CKMountable> const c) -> BOOL;
+auto CKComponentHasAnimationsOnFinalUnmountPredicate(id<CKMountable> const c) -> BOOL;
 
 /**
  A predicate that identifies a component that it's controller overrides the 'didPrepareLayout:forComponent:' method.
@@ -46,4 +51,7 @@ void CKComponentSendDidPrepareLayoutForComponentsWithIndexPaths(id<NSFastEnumera
  Update component of component controller in component trees of `indexPaths`of CKDataSourceState
  */
 void CKComponentUpdateComponentForComponentControllerWithIndexPaths(id<NSFastEnumeration> indexPaths,
-                                                                    CKDataSourceState *state);
+                                                                    CKDataSourceState *state,
+                                                                    BOOL shouldUpdateComponentOverride);
+
+#endif

@@ -10,8 +10,10 @@
 
 #import "CKDataSourceStateInternal.h"
 
-#import "CKEqualityHashHelpers.h"
-#import "CKMacros.h"
+#import <ComponentKit/CKEqualityHelpers.h>
+#import <ComponentKit/CKFunctionalHelpers.h>
+#import <ComponentKit/CKMacros.h>
+
 #import "CKDataSourceConfiguration.h"
 #import "CKDataSourceItem.h"
 
@@ -108,6 +110,38 @@ static NSArray *flattenedModelsFromSections(NSArray *sections)
     [modelSections addObject:modelSection];
   }
   return modelSections;
+}
+
+- (NSString *)contentsFingerprint
+{
+  __block auto itemTypes = std::vector<NSString *>{};
+  [self enumerateObjectsUsingBlock:^(CKDataSourceItem *item, NSIndexPath *, BOOL *) {
+    id const model = item.model;
+    if ([model respondsToSelector:@selector(model)] && [model respondsToSelector:@selector(context)]) {
+      itemTypes.push_back(NSStringFromClass([[model model] class]));
+      itemTypes.push_back(NSStringFromClass([[model context] class]));
+    } else {
+      itemTypes.push_back(NSStringFromClass([model class]));
+    }
+  }];
+  return fingerprintFromItemTypes(itemTypes);
+}
+
+static auto fingerprintFromItemTypes(const std::vector<NSString *> &types) -> NSString *
+{
+  auto const uniqueTypes = [NSMutableArray<NSString *> arrayWithCapacity:types.size()];
+  for (auto const &t : types) {
+    auto const typeOrNil = t ?: @"Nil";
+    if (![uniqueTypes containsObject:typeOrNil]) {
+      [uniqueTypes addObject:typeOrNil];
+    }
+  }
+  if ([uniqueTypes count] == 0) {
+    return @"";
+  }
+  auto const hashes = CK::map(uniqueTypes, [](NSString *t) { return [t hash]; });
+  auto const hash = CKIntegerArrayHash(hashes.data(), hashes.size());
+  return [NSString stringWithFormat:@"%lu", static_cast<unsigned long>(hash)];
 }
 
 @end

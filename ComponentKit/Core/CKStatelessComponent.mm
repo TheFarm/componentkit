@@ -9,6 +9,7 @@
  */
 
 #import "CKStatelessComponent.h"
+#import "CKStatelessComponentContext.h"
 
 @implementation CKStatelessComponent
 
@@ -25,23 +26,31 @@
 
 - (NSString *)description
 {
-  return [NSString stringWithFormat:@"%@ (%@)", _identifier, NSStringFromClass([self class])];
+  return [NSString stringWithFormat:@"<%@: %p> (%@)", _identifier, self, NSStringFromClass([self class])];
+}
+
+- (NSString *)debugName
+{
+  return self.description;
 }
 
 @end
 
 CKComponent *CKCreateStatelessComponent(NS_RELEASES_ARGUMENT CKComponent *component, const char *debugIdentifier) NS_RETURNS_RETAINED
 {
+  if (component) {
 #if CK_ASSERTIONS_ENABLED
-  if (component == nil) {
-    return nil;
-  }
-  return
-  [CKStatelessComponent
-   newWithView:{}
-   component:component
-   identifier:[NSString stringWithCString:debugIdentifier encoding:NSUTF8StringEncoding]];
+    auto const shouldAllocateComponent = YES;
 #else
-  return component;
+    auto const shouldAllocateComponent = [CKComponentContext<CKStatelessComponentContext>::get() shouldAllocateComponent];
 #endif
+    if (shouldAllocateComponent) {
+      return
+      [CKStatelessComponent
+       newWithView:{}
+       component:component
+       identifier:[NSString stringWithCString:debugIdentifier encoding:NSUTF8StringEncoding]];
+    }
+  }
+  return component;
 }

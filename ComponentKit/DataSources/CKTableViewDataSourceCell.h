@@ -7,12 +7,10 @@
 
 #import <UIKit/UIKit.h>
 
-NS_ASSUME_NONNULL_BEGIN
+#import <ComponentKit/CKNonNull.h>
 
 @class CKComponentRootView;
 
 @interface CKTableViewDataSourceCell : UITableViewCell
-@property (nonatomic, strong, readonly) CKComponentRootView *rootView;
+@property (nonatomic, assign, readonly) CK::NonNull<CKComponentRootView *> rootView;
 @end
-
-NS_ASSUME_NONNULL_END

@@ -8,13 +8,17 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #pragma once
 
 #include <new>
 #include <type_traits>
 #include <utility>
 
-#import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKFatal.h>
 #import <ComponentKit/CKOptional.h>
 
 namespace CK {
@@ -39,11 +43,26 @@ struct DelayedInitialisationWrapper final {
     _value = std::forward<Args...>(args...);
   }
 
-  operator const T&() const {
+  auto get() const -> const T& {
     if (_value.hasValue() == false) {
       CKCFatal(@"Expecting value to be set");
     }
     return *_value.unsafeValuePtrOrNull();
+  }
+
+  operator const T&() const {
+    return get();
+  }
+
+  auto get() -> T& {
+    if (_value.hasValue() == false) {
+      CKCFatal(@"Expecting value to be set");
+    }
+    return *_value.unsafeValuePtrOrNull();
+  }
+
+  operator T&() {
+    return get();
   }
 
   // Can't return a reference to the optional storage since it stores T, not U.
@@ -59,3 +78,5 @@ struct DelayedInitialisationWrapper final {
 };
 
 }
+
+#endif

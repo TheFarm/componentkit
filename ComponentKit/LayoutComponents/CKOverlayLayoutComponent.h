@@ -8,7 +8,11 @@
  *
  */
 
-#import <ComponentKit/CKRenderLayoutWithChildrenComponent.h>
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
+#import <ComponentKit/CKLayoutComponent.h>
 
 #import <ComponentKit/CKMacros.h>
 
@@ -17,7 +21,7 @@
 
  This component lays out a single component and then overlays a component on top of it streched to its size
  */
-@interface CKOverlayLayoutComponent : CKRenderLayoutWithChildrenComponent
+@interface CKOverlayLayoutComponent : CKLayoutComponent
 
 + (instancetype)newWithComponent:(CKComponent *)component
                          overlay:(CKComponent *)overlay;
@@ -26,3 +30,7 @@
                        size:(const CKComponentSize &)size CK_NOT_DESIGNATED_INITIALIZER_ATTRIBUTE;
 
 @end
+
+#import <ComponentKit/OverlayLayoutComponentBuilder.h>
+
+#endif

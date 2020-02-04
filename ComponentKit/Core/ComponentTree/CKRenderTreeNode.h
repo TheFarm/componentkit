@@ -8,13 +8,29 @@
  *
  */
 
-#import "CKScopeTreeNodeWithChild.h"
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
+#import <ComponentKit/CKScopeTreeNode.h>
+
+@protocol CKTreeNodeComponentProtocol;
 
 /**
  This object is a bridge between CKComponentScope and CKTreeNode.
 
  It represents a node for CKRenderComponent component in the component tree.
  */
-@interface CKRenderTreeNode : CKScopeTreeNodeWithChild
-- (void)didReuseNode:(CKRenderTreeNode *)node;
+@interface CKRenderTreeNode : CKScopeTreeNode
+
+/** Will be called after buildComponentTree: */
++ (void)didBuildComponentTree:(id<CKTreeNodeProtocol>)node;
+
+/** Will be called after component reuse */
+- (void)didReuseRenderNode:(CKRenderTreeNode *)node
+                 scopeRoot:(CKComponentScopeRoot *)scopeRoot
+         previousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot;
+
 @end
+
+#endif

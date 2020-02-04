@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentAnimationData.h>
@@ -22,6 +26,9 @@ namespace CK {
     auto inTransaction(VoidLambda1 t, VoidLambda2 c) const
     {
       [CATransaction begin];
+      // Setting `nil` explicitly here is necessary in order to avoid timing function of component animation
+      // being overidden by outer level animation, bounds animation for example.
+      [CATransaction setAnimationTimingFunction:nil];
       [CATransaction setCompletionBlock:^{ c(); }];
       t();
       [CATransaction commit];
@@ -131,3 +138,5 @@ namespace CK {
     int _animationID = 0;
   };
 }
+
+#endif

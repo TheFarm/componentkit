@@ -8,12 +8,18 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentLayout.h>
+#import <ComponentKit/CKComponentScopeTypes.h>
 #import <ComponentKit/CKDataSourceConfiguration.h>
 #import <ComponentKit/CKDataSourceStateModifying.h>
 
+@class CKComponentScopeRoot;
 @class CKDataSourceChangeset;
 @class CKDataSourceItem;
 
@@ -40,12 +46,9 @@ typedef NS_ENUM(NSUInteger, CKDataSourceChangesetModificationItemType) {
 
 - (instancetype)initWithChangeset:(CKDataSourceChangeset *)changeset
                     stateListener:(id<CKComponentStateListener>)stateListener
-                         userInfo:(NSDictionary *)userInfo;
-
-- (instancetype)initWithChangeset:(CKDataSourceChangeset *)changeset
-                    stateListener:(id<CKComponentStateListener>)stateListener
                          userInfo:(NSDictionary *)userInfo
-                              qos:(CKDataSourceQOS)qos;
+                              qos:(CKDataSourceQOS)qos
+          shouldValidateChangeset:(BOOL)shouldValidateChangeset;
 
 @property (nonatomic, readonly, strong) CKDataSourceChangeset *changeset;
 
@@ -59,3 +62,5 @@ namespace CK {
   auto invalidIndexesForInsertionInArray(NSArray *const a, NSIndexSet *const is) -> NSIndexSet *;
   auto invalidIndexesForRemovalFromArray(NSArray *const a, NSIndexSet *const is) -> NSIndexSet *;
 }
+
+#endif

@@ -13,6 +13,7 @@
 #import <ComponentKit/CKAnimationApplicator.h>
 #import <ComponentKit/CKComponent.h>
 #import <ComponentKit/CKComponentAnimationsController.h>
+#import <ComponentKit/CKFunctionalHelpers.h>
 
 #import "CKAnimationSpy.h"
 #import "CKComponentAnimationsEquality.h"

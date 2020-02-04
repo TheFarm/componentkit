@@ -10,14 +10,14 @@
 
 #import <XCTest/XCTest.h>
 
+#import <ComponentKit/CKComponent.h>
+#import <ComponentKit/CKComponentFlexibleSizeRangeProvider.h>
+#import <ComponentKit/CKComponentHostingContainerViewProvider.h>
+#import <ComponentKit/CKComponentLayout.h>
+#import <ComponentKit/CKComponentScopeRootFactory.h>
+
 #import <ComponentKitTestHelpers/CKLifecycleTestComponent.h>
 #import <ComponentKitTestHelpers/CKAnalyticsListenerSpy.h>
-
-#import "CKComponent.h"
-#import "CKComponentFlexibleSizeRangeProvider.h"
-#import "CKComponentHostingContainerViewProvider.h"
-#import "CKComponentLayout.h"
-#import "CKComponentScopeRootFactory.h"
 
 @interface CKComponentHostingContainerViewProviderTests : XCTestCase
 @end
@@ -43,7 +43,8 @@
    sizeRangeProvider:
    [CKComponentFlexibleSizeRangeProvider
     providerWithFlexibility:CKComponentSizeRangeFlexibilityNone]
-   allowTapPassthrough:NO];
+   allowTapPassthrough:NO
+   rootViewPoolOptions:CK::none];
 
   const auto result = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, _analyticsListener),
                                        {},

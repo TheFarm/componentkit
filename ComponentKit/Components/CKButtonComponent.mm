@@ -13,8 +13,8 @@
 #import <array>
 
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKInternalHelpers.h>
 
-#import "CKInternalHelpers.h"
 #import "CKComponentSubclass.h"
 
 struct CKStateConfiguration {
@@ -59,7 +59,7 @@ typedef std::array<CKStateConfiguration, 8> CKStateConfigurationArray;
   static const CKComponentViewAttribute titleFontAttribute = {"CKButtonComponent.titleFont", ^(UIButton *button, id value) {
     button.titleLabel.font = value;
   }};
-  
+
   static const CKComponentViewAttribute titleAlignmentAttribute = {"CKButtonComponent.titleAlignment", ^(UIButton *button, id value) {
     button.titleLabel.textAlignment = (NSTextAlignment)[value integerValue];
   }};

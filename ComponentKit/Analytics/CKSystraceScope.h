@@ -8,10 +8,15 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
-@protocol CKSystraceListener;
+#import <ComponentKit/CKAsyncBlock.h>
 
+@protocol CKSystraceListener;
 
 /**
  Starts a block tracer when it is constructed and ends it when destructed.
@@ -19,7 +24,7 @@
  Notes:
  The following methods will be called on CKSystraceListener:
  - (void)willStartBlockTrace:(const char *const)blockName;
- - (void)didStartBlockTrace:(const char *const)blockName;
+ - (void)didEndBlockTrace:(const char *const)blockName;
 
  Example usage:
  - (void)proccessImage
@@ -31,13 +36,17 @@
 class CKSystraceScope {
 public:
   CKSystraceScope(const char *const blockName) noexcept;
+  CKSystraceScope(const CK::Analytics::AsyncBlock &asyncBlock) noexcept;
   ~CKSystraceScope();
 
 private:
   const char *const _blockName;
   id<CKSystraceListener> _systraceListener;
+  bool _isAsync;
   CKSystraceScope(const CKSystraceScope &) = delete; // copy
   CKSystraceScope &operator=(const CKSystraceScope&) = delete;
   CKSystraceScope(CKSystraceScope&&) = delete; // move
   CKSystraceScope &operator=(CKSystraceScope&&) = delete;
 };
+
+#endif

@@ -12,7 +12,7 @@
 #import "CKAsyncLayerInternal.h"
 #import "CKAsyncLayerSubclass.h"
 
-#include <libkern/OSAtomic.h>
+#import <stdatomic.h>
 
 #import <ComponentKit/CKAssert.h>
 
@@ -87,15 +87,15 @@
 - (void)cancelAsyncDisplay
 {
   CKAssertMainThread();
-  OSAtomicIncrement32(&_displaySentinel);
+  atomic_fetch_add_explicit(&_displaySentinel, 1, memory_order_relaxed);
 }
 
 + (ck_async_transaction_operation_block_t)asyncDisplayBlockWithBounds:(CGRect)bounds
                                                         contentsScale:(CGFloat)contentsScale
                                                                opaque:(BOOL)opaque
                                                       backgroundColor:(CGColorRef)backgroundColor
-                                                      displaySentinel:(int32_t *)displaySentinel
-                                         expectedDisplaySentinelValue:(int32_t)expectedDisplaySentinelValue
+                                                      displaySentinel:(atomic_int *)displaySentinel
+                                         expectedDisplaySentinelValue:(atomic_int)expectedDisplaySentinelValue
                                                       drawingDelegate:(id<CKAsyncLayerDrawingDelegate>)drawingDelegate
                                                        drawParameters:(NSObject *)drawParameters
 {
@@ -175,7 +175,7 @@
     return;
   }
 
-  int32_t displaySentinelValue = OSAtomicIncrement32(&_displaySentinel);
+  atomic_int displaySentinelValue = atomic_fetch_add_explicit(&_displaySentinel, 1, memory_order_relaxed);
   CALayer *containerLayer = parentTransactionContainer ?: self;
   CKAsyncTransaction *transaction = containerLayer.ck_asyncTransaction;
   CKAssertNotNil(transaction, @"Expected async layer transaction to be non-nil");

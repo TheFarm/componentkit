@@ -25,6 +25,13 @@
 
 static NSString *const indentString = @"| ";
 
+@interface CKComponentHierarchyDebugHelper ()
+
++ (NSString *)componentHierarchyDescriptionForView:(UIView *)view NS_EXTENSION_UNAVAILABLE("Recursively describes components using -[UIApplication keyWindow]");
++ (NSString *)componentHierarchyDescriptionForView:(UIView *)view searchUpwards:(BOOL)upwards showViews:(BOOL)showViews NS_EXTENSION_UNAVAILABLE("Recursively describes components using -[UIApplication keyWindow]");
+
+@end
+
 @implementation CKComponentHierarchyDebugHelper
 
 + (NSString *)componentHierarchyDescription
@@ -40,7 +47,7 @@ static NSString *const indentString = @"| ";
 }
 
 /** Used by Chisel. Don't rename or remove this without changing Chisel! */
-+ (NSString *)componentHierarchyDescriptionForView:(UIView *)view
++ (NSString *)componentHierarchyDescriptionForView:(UIView *)view  NS_EXTENSION_UNAVAILABLE("Recursively describes components using -[UIApplication keyWindow]")
 {
   if (view == nil) {
     return [self componentHierarchyDescription];
@@ -52,14 +59,14 @@ static NSString *const indentString = @"| ";
 }
 
 /** Deprecated, used by old versions of Chisel. If you come across this after June 2018, delete it. */
-+ (NSString *)componentHierarchyDescriptionForView:(UIView *)view searchUpwards:(BOOL)upwards showViews:(BOOL)showViews
++ (NSString *)componentHierarchyDescriptionForView:(UIView *)view searchUpwards:(BOOL)upwards showViews:(BOOL)showViews  NS_EXTENSION_UNAVAILABLE("Recursively describes components using -[UIApplication keyWindow]")
 {
   return [self componentHierarchyDescriptionForView:view];
 }
 
 static void buildRecursiveDescriptionForView(NSMutableString *description,
                                              NSMutableSet<UIView *> *visitedViews,
-                                             NSMutableSet<CKComponent *> *visitedComponents,
+                                             NSMutableSet<id<CKMountable>> *visitedComponents,
                                              UIView *view,
                                              NSString *prefix)
 {
@@ -167,7 +174,7 @@ static const CKComponentLayout findLayoutForComponent(UIView *view, CKComponent 
 
 static void buildRecursiveDescriptionForLayout(NSMutableString *description,
                                                NSMutableSet<UIView *> *visitedViews,
-                                               NSMutableSet<CKComponent *> *visitedComponents,
+                                               NSMutableSet<id<CKMountable>> *visitedComponents,
                                                const CKComponentLayout &layout,
                                                CGPoint position,
                                                NSString *prefix)
@@ -175,7 +182,7 @@ static void buildRecursiveDescriptionForLayout(NSMutableString *description,
   if (layout.component == nil) {
     return;
   }
-  CKComponent *component = layout.component;
+  auto component = layout.component;
   if ([visitedComponents containsObject:component]) {
     return;
   }

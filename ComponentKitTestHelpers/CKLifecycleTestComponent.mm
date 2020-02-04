@@ -11,6 +11,7 @@
 #import <ComponentKitTestHelpers/CKLifecycleTestComponent.h>
 
 #import <ComponentKit/CKComponentSubclass.h>
+#import <ComponentKit/CKFatal.h>
 
 @implementation CKLifecycleTestComponent
 
@@ -21,7 +22,7 @@
 
 static BOOL _shouldEarlyReturnNew = NO;
 
-+ (void)setShouldEarlyReturnNew:(BOOL)shouldEarlyReturnNew
+auto CKLifecycleTestComponentSetShouldEarlyReturnNew(BOOL shouldEarlyReturnNew) -> void
 {
   _shouldEarlyReturnNew = shouldEarlyReturnNew;
 }
@@ -83,6 +84,18 @@ static BOOL _shouldEarlyReturnNew = NO;
 @end
 
 @implementation CKLifecycleTestComponentController
+
+- (void)didInit
+{
+  if (![NSThread isMainThread]) {
+    CKFatal(@"didInit should only be called on main thread");
+  } else if (_calledDidInit) {
+    CKFatal(@"didInit should only be called once");
+  }
+
+  [super didInit];
+  _calledDidInit = YES;
+}
 
 - (void)willMount
 {
@@ -160,6 +173,8 @@ static BOOL _shouldEarlyReturnNew = NO;
 {
   if (![NSThread isMainThread]) {
     CKFatal(@"InvalidateController should only be called on main thread");
+  } else if (_calledInvalidateController) {
+    CKFatal(@"InvalidateController should only be called once");
   }
   [super invalidateController];
   _calledInvalidateController = YES;

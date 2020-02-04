@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentScopeTypes.h>
@@ -17,7 +21,7 @@
 /**
  Allows rapid enumeration over the components or controllers that matched a predicate. The predicate should be provided
  in the initializer of the scope root in order to reduce the runtime costs of the enumeration.
- 
+
  There is no guaranteed ordering of arguments that are provided to the enumerators.
  */
 - (void)enumerateComponentsMatchingPredicate:(CKComponentPredicate)predicate
@@ -27,3 +31,5 @@
                                                  block:(CKComponentControllerScopeEnumerator)block;
 
 @end
+
+#endif

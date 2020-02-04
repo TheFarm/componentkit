@@ -8,13 +8,20 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKBuildComponent.h>
 #import <ComponentKit/CKComponentProtocol.h>
 #import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKGlobalConfig.h>
+#import <ComponentKit/CKIterable.h>
 #import <ComponentKit/CKTreeNodeTypes.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @protocol CKSystraceListener;
 @protocol CKDebugAnalyticsListener;
@@ -49,35 +56,28 @@ struct CKBuildComponentTreeParams {
   const CKTreeNodeDirtyIds &treeNodeDirtyIds;
 
   // The trigger for initiating a new generation
-  BuildTrigger buildTrigger;
+  CKBuildTrigger buildTrigger;
 
   // The current systrace listener. Can be nil if systrace is not enabled.
-  id<CKSystraceListener> systraceListener;
+  id<CKSystraceListener> _Nullable systraceListener;
 
-  // The current debug listener. Can be nil.
-  id<CKDebugAnalyticsListener> debugAnalyticsListener;
+  // Collect tree node information for logging.
+  BOOL shouldCollectTreeNodeCreationInformation;
 
-  // When enabled, all the comopnents will be regenerated (no component reuse optimiztions).
-  BOOL ignoreComponentReuseOptimizations = NO;
-  
-  // When enabled, we will cache the layout in render components and reuse it during a component reuse.
-  BOOL enableLayoutCache = NO;
-
-  // Merge Tree Nodes and Scope Frames
-  CKUnifyComponentTreeConfig unifyComponentTreeConfig;
+  // When disabled, all the comopnents will be regenerated (no component reuse optimiztions). Enabled by default.
+  BOOL enableComponentReuseOptimizations = YES;
 };
 
 @protocol CKTreeNodeWithChildrenProtocol;
-
 
 /**
  The component that is hosted by a `CKTreeNodeProtocol`.
  It represents the component holding the the scope handle, capable of building a component tree (CKTreeNode).
  */
-@protocol CKTreeNodeComponentProtocol<CKComponentProtocol>
+@protocol CKTreeNodeComponentProtocol<CKComponentProtocol, CKIterable>
 
 /** Reference to the component's scope handle. */
-- (CKComponentScopeHandle *)scopeHandle;
+- (CKComponentScopeHandle * _Nullable)scopeHandle;
 
 /** Ask the component to acquire a scope handle. */
 - (void)acquireScopeHandle:(CKComponentScopeHandle *)scopeHandle;
@@ -87,12 +87,9 @@ struct CKBuildComponentTreeParams {
  It's being called by the infra during the component tree creation.
  */
 - (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
-            previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
+            previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                     params:(const CKBuildComponentTreeParams &)params
       parentHasStateUpdate:(BOOL)parentHasStateUpdate;
-
-/** Returns true if the component requires scope handle */
-+ (BOOL)requiresScopeHandle;
 
 #if DEBUG
 // These two methods are in DEBUG only in order to save memory.
@@ -103,7 +100,10 @@ struct CKBuildComponentTreeParams {
 - (void)acquireTreeNode:(id<CKTreeNodeProtocol>)treeNode;
 
 /** Reference to the component's tree node. */
-- (id<CKTreeNodeProtocol>)treeNode;
+- (id<CKTreeNodeProtocol> _Nullable)treeNode;
+
+/** Get child at index; can be nil */
+- (id<CKTreeNodeComponentProtocol> _Nullable)childAtIndex:(unsigned int)index;
 #endif
 
 @end
@@ -115,12 +115,12 @@ struct CKBuildComponentTreeParams {
 
 @protocol CKTreeNodeProtocol <NSObject>
 
-@property (nonatomic, strong, readonly) id<CKTreeNodeComponentProtocol> component;
-@property (nonatomic, strong, readonly) CKComponentScopeHandle *handle;
-@property (nonatomic, assign, readonly) CKTreeNodeIdentifier nodeIdentifier;
+- (id<CKTreeNodeComponentProtocol>)component;
+- (CKComponentScopeHandle * _Nullable)scopeHandle;
+- (CKTreeNodeIdentifier)nodeIdentifier;
 
 /** Returns the component's state */
-- (id)state;
+- (id _Nullable)state;
 
 /** Returns the componeny key according to its current owner */
 - (const CKTreeNodeComponentKey &)componentKey;
@@ -131,7 +131,9 @@ struct CKBuildComponentTreeParams {
 /** This method should be called on nodes that have been created from CKComponentScope */
 - (void)linkComponent:(id<CKTreeNodeComponentProtocol>)component
              toParent:(id<CKTreeNodeWithChildrenProtocol>)parent
-            scopeRoot:(CKComponentScopeRoot *)scopeRoot;
+       previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
+               params:(const CKBuildComponentTreeParams &)params;
+
 #if DEBUG
 /** Returns a multi-line string describing this node and its children nodes */
 - (NSString *)debugDescription;
@@ -153,28 +155,28 @@ struct CKBuildComponentTreeParams {
 - (size_t)childrenSize;
 
 /** Returns a component tree node according to its component key */
-- (id<CKTreeNodeProtocol>)childForComponentKey:(const CKTreeNodeComponentKey &)key;
+- (id<CKTreeNodeProtocol> _Nullable)childForComponentKey:(const CKTreeNodeComponentKey &)key;
 
 /** Creates a component key for a child node according to its component class; this method is being called once during the component tree creation */
 - (CKTreeNodeComponentKey)createComponentKeyForChildWithClass:(id<CKComponentProtocol>)componentClass
-                                                   identifier:(id<NSObject>)identifier;
+                                                   identifier:(id<NSObject> _Nullable)identifier;
 
 /** Save a child node in the parent node according to its component key; this method is being called once during the component tree creation */
 - (void)setChild:(id<CKTreeNodeProtocol>)child forComponentKey:(const CKTreeNodeComponentKey &)componentKey;
 
 @end
 
-@protocol CKTreeNodeWithChildProtocol <CKTreeNodeWithChildrenProtocol>
-@property (nonatomic, strong) id<CKTreeNodeProtocol> child;
-@end
-
 /**
- Default empty state for CKRenderComponentProtocol components.
+ A marker used as a performance optimization by CKRenderComponentProtocol components.
 
- If a CKRenderComponentProtocol returns any state other than `CKTreeNodeEmptyState` (including nil)
- - the infra will create it a scope handle and will support a state update.
- Othwerwise, the component will be stateless.
+ If a component conforming to CKRenderComponentProtocol returns this value as its initial state,
+ the infrastructure will SKIP creating a tree node, disabling state updates -- unless some other
+ attribute of the component requires it (e.g. it has a controller).
+
+ This is a performance optimization, since tree nodes are not free.
  */
-@interface CKTreeNodeEmptyState : NSObject
-+ (id)emptyState;
-@end
+id CKTreeNodeEmptyState(void);
+
+NS_ASSUME_NONNULL_END
+
+#endif

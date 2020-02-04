@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <ComponentKit/CKDataSource.h>
 
 @class CKDataSourceChange;
@@ -25,6 +29,19 @@
  Current state of CKDataSource. This is main thread affined.
  */
 @property (nonatomic, strong, readonly) CKDataSourceState *state;
+
+/**
+ State updates that are triggered after this flag is set to YES won't be processed until
+ it's set to NO again. This is main thread affined.
+ */
+@property (nonatomic, assign) BOOL shouldPauseStateUpdates;
+
+/**
+ `CKDataSourceQoSDefault` will be mapped to a lower QoS class when this is set to `YES`.
+ This means applying changeset with default QoS or processing state update is affected when this is set to `YES`.
+ This is main thread affined.
+ */
+@property (nonatomic, assign) BOOL isBackgroundMode;
 
 /**
  @param state initial state of dataSource, pass `nil` for an empty state.
@@ -48,3 +65,5 @@
 - (BOOL)verifyChange:(CKDataSourceChange *)change;
 
 @end
+
+#endif

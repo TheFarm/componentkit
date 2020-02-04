@@ -23,8 +23,13 @@
 		B34FB9821ABE8BA300D2D896 /* WildeGuessCollectionViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = B34FB9751ABE8BA300D2D896 /* WildeGuessCollectionViewController.mm */; };
 		B34FB9841ABE8BB000D2D896 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = B34FB9831ABE8BB000D2D896 /* main.m */; };
 		B3E848D11ABE848900377D52 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B3E848D01ABE848900377D52 /* Images.xcassets */; };
-		D093267A1CC4674400CFEBC4 /* ComponentKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D093266D1CC4647700CFEBC4 /* ComponentKit.framework */; };
-		D093267B1CC4675200CFEBC4 /* ComponentKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D093266D1CC4647700CFEBC4 /* ComponentKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D43188C123E209BE0024AA12 /* ComponentKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D093266D1CC4647700CFEBC4 /* ComponentKit.framework */; };
+		D43188C223E209BE0024AA12 /* ComponentKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D093266D1CC4647700CFEBC4 /* ComponentKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D43188C423E209C40024AA12 /* RenderCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D43187DC23E2011C0024AA12 /* RenderCore.framework */; };
+		D43188C523E209C40024AA12 /* RenderCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D43187DC23E2011C0024AA12 /* RenderCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D44CF6AC23E1D0E50056039B /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44CF6AB23E1D0E50056039B /* Swift.swift */; };
+		D4BC57BC23E384050075D688 /* CKSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D4BC57B923E384050075D688 /* CKSwift.framework */; };
+		D4BC57BD23E384050075D688 /* CKSwift.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D4BC57B923E384050075D688 /* CKSwift.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,16 +96,53 @@
 			remoteGlobalIDString = A273801A1AFD144100E6F222;
 			remoteInfo = ComponentKitTestHelpers;
 		};
+		D43187DB23E2011C0024AA12 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = D48293D823DF9EEB00017D94;
+			remoteInfo = RenderCore;
+		};
+		D43187DD23E2011C0024AA12 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = D48293FA23DF9F4100017D94;
+			remoteInfo = RenderCoreAppleTV;
+		};
+		D44CF6A223E1CFFA0056039B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = A1AB4FED23350E45001F41DB;
+			remoteInfo = ComponentKitPerfTests;
+		};
+		D4BC57B823E384050075D688 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = D4BC578023E37A1B0075D688;
+			remoteInfo = CKSwift;
+		};
+		D4BC57BA23E384050075D688 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = D4BC578823E37A1B0075D688;
+			remoteInfo = CKSwiftTests;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		D0B47DE11CBDB06C00BB33CE /* Embed Frameworks */ = {
+		D43188C323E209BF0024AA12 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				D093267B1CC4675200CFEBC4 /* ComponentKit.framework in Embed Frameworks */,
+				D43188C223E209BE0024AA12 /* ComponentKit.framework in Embed Frameworks */,
+				D4BC57BD23E384050075D688 /* CKSwift.framework in Embed Frameworks */,
+				D43188C523E209C40024AA12 /* RenderCore.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -142,6 +184,8 @@
 		B3E848C41ABE848900377D52 /* WildeGuess-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "WildeGuess-Info.plist"; sourceTree = "<group>"; };
 		B3E848D01ABE848900377D52 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		D0B47DC41CBDAFFF00BB33CE /* ComponentKit.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = ComponentKit.xcodeproj; path = ../../ComponentKit.xcodeproj; sourceTree = SOURCE_ROOT; };
+		D44CF6AA23E1D0E40056039B /* WildeGuess-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "WildeGuess-Bridging-Header.h"; sourceTree = "<group>"; };
+		D44CF6AB23E1D0E50056039B /* Swift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swift.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,7 +193,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D093267A1CC4674400CFEBC4 /* ComponentKit.framework in Frameworks */,
+				D43188C123E209BE0024AA12 /* ComponentKit.framework in Frameworks */,
+				D4BC57BC23E384050075D688 /* CKSwift.framework in Frameworks */,
+				D43188C423E209C40024AA12 /* RenderCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -212,6 +258,7 @@
 				B34FB95B1ABE8BA300D2D896 /* AppDelegate.m */,
 				B34FB96B1ABE8BA300D2D896 /* Quote.h */,
 				B34FB96C1ABE8BA300D2D896 /* Quote.m */,
+				D44CF6AB23E1D0E50056039B /* Swift.swift */,
 				B34FB96D1ABE8BA300D2D896 /* QuoteContext.h */,
 				B34FB96E1ABE8BA300D2D896 /* QuoteContext.mm */,
 				B34FB96F1ABE8BA300D2D896 /* QuoteDisplayStyle.h */,
@@ -223,6 +270,7 @@
 				B34FB9751ABE8BA300D2D896 /* WildeGuessCollectionViewController.mm */,
 				B3E848D01ABE848900377D52 /* Images.xcassets */,
 				B3E848C31ABE848900377D52 /* Supporting Files */,
+				D44CF6AA23E1D0E40056039B /* WildeGuess-Bridging-Header.h */,
 			);
 			path = WildeGuess;
 			sourceTree = "<group>";
@@ -241,6 +289,7 @@
 			children = (
 				D093266D1CC4647700CFEBC4 /* ComponentKit.framework */,
 				D09326771CC4647700CFEBC4 /* libComponentKitTestHelpers.a */,
+				D44CF6A323E1CFFA0056039B /* ComponentKitPerfTests.xctest */,
 				D09326711CC4647700CFEBC4 /* ComponentKitTests.xctest */,
 				D09326731CC4647700CFEBC4 /* ComponentKitApplicationTests.xctest */,
 				D09326751CC4647700CFEBC4 /* ComponentTextKitApplicationTests.xctest */,
@@ -248,6 +297,10 @@
 				40953BEC22AA2A54006A8511 /* ComponentKit.framework */,
 				40953BEE22AA2A54006A8511 /* libComponentKitTestHelpers.a */,
 				40953BF022AA2A54006A8511 /* ComponentKitTestsAppleTV.xctest */,
+				D43187DE23E2011C0024AA12 /* RenderCore.framework */,
+				D43187DC23E2011C0024AA12 /* RenderCore.framework */,
+				D4BC57B923E384050075D688 /* CKSwift.framework */,
+				D4BC57BB23E384050075D688 /* CKSwiftTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -262,7 +315,7 @@
 				B3E848BC1ABE848900377D52 /* Sources */,
 				B3E848BD1ABE848900377D52 /* Frameworks */,
 				B3E848BE1ABE848900377D52 /* Resources */,
-				D0B47DE11CBDB06C00BB33CE /* Embed Frameworks */,
+				D43188C323E209BF0024AA12 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -283,6 +336,7 @@
 				TargetAttributes = {
 					B3E848BF1ABE848900377D52 = {
 						CreatedOnToolsVersion = 6.1;
+						LastSwiftMigration = 1130;
 					};
 				};
 			};
@@ -291,6 +345,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 				Base,
 			);
@@ -374,6 +429,41 @@
 			remoteRef = D09326761CC4647700CFEBC4 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
+		D43187DC23E2011C0024AA12 /* RenderCore.framework */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.framework;
+			path = RenderCore.framework;
+			remoteRef = D43187DB23E2011C0024AA12 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D43187DE23E2011C0024AA12 /* RenderCore.framework */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.framework;
+			path = RenderCore.framework;
+			remoteRef = D43187DD23E2011C0024AA12 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D44CF6A323E1CFFA0056039B /* ComponentKitPerfTests.xctest */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = ComponentKitPerfTests.xctest;
+			remoteRef = D44CF6A223E1CFFA0056039B /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D4BC57B923E384050075D688 /* CKSwift.framework */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.framework;
+			path = CKSwift.framework;
+			remoteRef = D4BC57B823E384050075D688 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D4BC57BB23E384050075D688 /* CKSwiftTests.xctest */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = CKSwiftTests.xctest;
+			remoteRef = D4BC57BA23E384050075D688 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 /* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
@@ -395,6 +485,7 @@
 				B34FB97F1ABE8BA300D2D896 /* QuoteContext.mm in Sources */,
 				B34FB9811ABE8BA300D2D896 /* QuotesPage.m in Sources */,
 				B34FB97E1ABE8BA300D2D896 /* Quote.m in Sources */,
+				D44CF6AC23E1D0E50056039B /* Swift.swift in Sources */,
 				A2BC94DC1AC235A60043B82F /* QuoteComponent.mm in Sources */,
 				B34FB9801ABE8BA300D2D896 /* QuoteModelController.mm in Sources */,
 				B34FB9821ABE8BA300D2D896 /* WildeGuessCollectionViewController.mm in Sources */,
@@ -494,9 +585,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_MODULES = YES;
 				INFOPLIST_FILE = "WildeGuess/WildeGuess-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "WildeGuess/WildeGuess-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -505,9 +600,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_MODULES = YES;
 				INFOPLIST_FILE = "WildeGuess/WildeGuess-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "WildeGuess/WildeGuess-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};

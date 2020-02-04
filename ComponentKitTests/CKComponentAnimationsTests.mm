@@ -17,7 +17,7 @@
 #import <ComponentKit/CKComponentScopeRootFactory.h>
 #import <ComponentKit/CKComponentSubclass.h>
 #import <ComponentKit/CKComponentAnimations.h>
-#import <ComponentKit/CKCompositeComponentInternal.h>
+#import <ComponentKit/CKCompositeComponent.h>
 #import <ComponentKit/CKThreadLocalComponentScope.h>
 
 #import "CKComponentAnimationsEquality.h"
@@ -49,7 +49,7 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
 {
   const auto r = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   const auto bcr = CKBuildComponent(r, {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithInitialMountAnimations new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithInitialMountAnimations new]).build();
   });
   const auto c = CK::objCForceCast<CKCompositeComponent>(bcr.component);
   const auto l = CKComputeRootComponentLayout(c, sizeRange, nil);
@@ -57,7 +57,7 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
   const auto diff = CK::animatedComponentsBetweenLayouts(l, {});
 
   const auto expectedDiff = CK::ComponentTreeDiff {
-    .appearedComponents = {c.component},
+    .appearedComponents = {c.child},
   };
   XCTAssert(diff == expectedDiff);
 }
@@ -65,11 +65,11 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
 - (void)test_WhenPreviousTreeIsNotEmpty_ReturnsOnlyNewComponentsWithInitialMountAnimationsAsAppeared
 {
   const auto bcr = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithInitialMountAnimations new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithInitialMountAnimations new]).build();
   });
   const auto l = CKComputeRootComponentLayout(bcr.component, sizeRange, nil);
   const auto bcr2 = CKBuildComponent(bcr.scopeRoot, {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithInitialMountAnimations new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithInitialMountAnimations new]).build();
   });
   const auto l2 = CKComputeRootComponentLayout(bcr2.component, sizeRange, nil);
 
@@ -81,12 +81,12 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
 - (void)test_WhenPreviousTreeIsNotEmpty_ReturnsComponentsWithChangeAnimationsAsUpdated
 {
   const auto bcr = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithAnimationsFromPreviousComponent new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithAnimationsFromPreviousComponent new]).build();
   });
   const auto c = CK::objCForceCast<CKCompositeComponent>(bcr.component);
   const auto l = CKComputeRootComponentLayout(c, sizeRange, nil);
   const auto bcr2 = CKBuildComponent(bcr.scopeRoot, {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithAnimationsFromPreviousComponent new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithAnimationsFromPreviousComponent new]).build();
   });
   const auto c2 = CK::objCForceCast<CKCompositeComponent>(bcr2.component);
   const auto l2 = CKComputeRootComponentLayout(c2, sizeRange, nil);
@@ -94,7 +94,7 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
   const auto diff = CK::animatedComponentsBetweenLayouts(l2, l);
 
   const auto expectedDiff = CK::ComponentTreeDiff {
-    .updatedComponents = {{c.component, c2.component}},
+    .updatedComponents = {{c.child, c2.child}},
   };
   XCTAssert(diff == expectedDiff);
 }
@@ -102,7 +102,7 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
 - (void)test_WhenPreviousTreeHasTheSameComponents_DoesNotReturnThemAsUpdated
 {
   const auto bcr = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
-    return [CKCompositeComponent newWithComponent:[ComponentWithAnimationsFromPreviousComponent new]];
+    return CK::CompositeComponentBuilder().component([ComponentWithAnimationsFromPreviousComponent new]).build();
   });
   const auto l = CKComputeRootComponentLayout(bcr.component, sizeRange, nil);
 
@@ -116,14 +116,14 @@ const auto sizeRange = CKSizeRange {CGSizeZero, {INFINITY, INFINITY}};
   __block ComponentWithAnimationOnFinalUnmount *c;
   const auto bcr = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
     c = [ComponentWithAnimationOnFinalUnmount new];
-    return [CKCompositeComponent newWithComponent:[CompositeComponentWithScope newWithComponent:c]];
+    return CK::CompositeComponentBuilder().component([CompositeComponentWithScope newWithComponent:c]).build();
   });
   const auto l = CKComputeRootComponentLayout(bcr.component, sizeRange, nil);
   const auto bcr2 = CKBuildComponent(bcr.scopeRoot, {}, ^{
     // Compared to the previous tree there are two components that have disappeared: CompositeComponentWithScope and
     // ComponentWithDisappearAnimation. However, we should get only the latter in ComponentTreeDiff::disappearedComponents
     // since the former doesn't define any disappear animation.
-    return [CKCompositeComponent newWithComponent:[CKComponent new]];
+    return CK::CompositeComponentBuilder().component([CKComponent new]).build();
   });
   const auto l2 = CKComputeRootComponentLayout(bcr2.component, sizeRange, nil);
 

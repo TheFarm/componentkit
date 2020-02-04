@@ -8,9 +8,14 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <ComponentKit/CKComponentContext.h>
+#import <ComponentKit/CKComponentScopeTypes.h>
 #import <ComponentKit/CKUpdateMode.h>
 
 #include <memory>
@@ -61,6 +66,9 @@ public:
   /** @return The current state for the component being built. */
   id state(void) const noexcept;
 
+  /** @return The scope identifer for the component being built. */
+  CKComponentScopeHandleIdentifier identifier(void) const noexcept;
+
   /**
    @return A block that schedules a state update when invoked.
    @discussion Usually, prefer the more idiomatic [CKComponent -updateState:mode:]. Use this in the rare case where you
@@ -98,3 +106,5 @@ private:
   CKThreadLocalComponentScope *_threadLocalScope;
   CKComponentScopeHandle *_scopeHandle;
 };
+
+#endif

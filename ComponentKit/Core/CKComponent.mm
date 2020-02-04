@@ -13,42 +13,39 @@
 #import "CKComponentInternal.h"
 #import "CKComponentSubclass.h"
 
-#import <ComponentKit/CKArgumentPrecondition.h>
-#import <ComponentKit/CKComponentScopeEnumeratorProvider.h>
+#import <ComponentKit/CKAnalyticsListener.h>
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKArgumentPrecondition.h>
 #import <ComponentKit/CKBuildComponent.h>
+#import <ComponentKit/CKComponentScopeEnumeratorProvider.h>
 #import <ComponentKit/CKComponentContextHelper.h>
+#import <ComponentKit/CKFatal.h>
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKMacros.h>
-#import <ComponentKit/CKMutex.h>
+#import <ComponentKit/CKTreeNodeProtocol.h>
+#import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKWeakObjectContainer.h>
+#import <ComponentKit/CKComponentDescriptionHelper.h>
+#import <ComponentKit/CKMountableHelpers.h>
 
-#import "CKAssert.h"
 #import "CKComponent+UIView.h"
 #import "CKComponentAccessibility.h"
 #import "CKComponentAnimation.h"
 #import "CKComponentController.h"
 #import "CKComponentDebugController.h"
-#import "CKComponentDescriptionHelper.h"
 #import "CKComponentLayout.h"
 #import "CKComponentScopeHandle.h"
 #import "CKComponentViewConfiguration.h"
-#import "CKInternalHelpers.h"
 #import "CKMountAnimationGuard.h"
-#import "CKWeakObjectContainer.h"
 #import "ComponentLayoutContext.h"
 #import "CKThreadLocalComponentScope.h"
 #import "CKComponentScopeRoot.h"
 #import "CKRenderHelpers.h"
 #import "CKComponentCreationValidation.h"
+#import "CKSizeAssert.h"
 
 CGFloat const kCKComponentParentDimensionUndefined = NAN;
 CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndefined, kCKComponentParentDimensionUndefined};
-
-struct CKComponentMountInfo {
-  CKComponent *supercomponent;
-  UIView *view;
-  CKComponentViewContext viewContext;
-};
 
 @implementation CKComponent
 {
@@ -56,7 +53,7 @@ struct CKComponentMountInfo {
   CKComponentViewConfiguration _viewConfiguration;
 
   /** Only non-null while mounted. */
-  std::unique_ptr<CKComponentMountInfo> _mountInfo;
+  std::unique_ptr<CKMountInfo> _mountInfo;
 
 #if DEBUG
   __weak id<CKTreeNodeProtocol> _treeNode;
@@ -116,7 +113,7 @@ struct CKComponentMountInfo {
                                        size:(const CKComponentSize &)size
 {
   if (self = [super init]) {
-    CKValidateComponentCreation();
+    CKValidateRenderComponentCreation();
     // Mark render component in the scope root.
     CKThreadLocalComponentScope::markCurrentScopeWithRenderComponentInTree();
     CKComponentContextHelper::didCreateRenderComponent(self);
@@ -175,15 +172,14 @@ struct CKComponentMountInfo {
 #pragma mark - ComponentTree
 
 - (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
-            previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
+            previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                     params:(const CKBuildComponentTreeParams &)params
       parentHasStateUpdate:(BOOL)parentHasStateUpdate
 {
 #if CK_ASSERTIONS_ENABLED
   leafComponentOnARenderTree = YES;
 #endif
-  // In this case this is a leaf component, which means we don't need to continue the recursion as it has no children.
-  CKRender::buildComponentTreeForLeafComponent(self, parent, previousParent, params);
+  CKRender::ComponentTree::Iterable::build(self, parent, previousParent, params, parentHasStateUpdate);
 }
 
 #pragma mark - Mounting and Unmounting
@@ -192,17 +188,14 @@ struct CKComponentMountInfo {
                                         size:(const CGSize)size
                                     children:(std::shared_ptr<const std::vector<CKComponentLayoutChild>>)children
                               supercomponent:(CKComponent *)supercomponent
-                            systraceListener:(id<CKSystraceListener>)systraceListener
 {
   CKCAssertWithCategory([NSThread isMainThread], [self class], @"This method must be called on the main thread");
-
-  [systraceListener willMountComponent:self];
 
   // Taking a const ref to a temporary extends the lifetime of the temporary to the lifetime of the const ref
   const CKComponentViewConfiguration &viewConfiguration = CK::Component::Accessibility::IsAccessibilityEnabled() ? CK::Component::Accessibility::AccessibleViewConfiguration(_viewConfiguration) : _viewConfiguration;
 
   if (_mountInfo == nullptr) {
-    _mountInfo.reset(new CKComponentMountInfo());
+    _mountInfo.reset(new CKMountInfo());
   }
   _mountInfo->supercomponent = supercomponent;
 
@@ -228,15 +221,14 @@ struct CKComponentMountInfo {
     }
 
     @try {
-      const CGPoint anchorPoint = v.layer.anchorPoint;
-      [v setCenter:effectiveContext.position + CGPoint({size.width * anchorPoint.x, size.height * anchorPoint.y})];
-      [v setBounds:{v.bounds.origin, size}];
+      CKSetViewPositionAndBounds(v, context, size);
     } @catch (NSException *exception) {
-      NSString *const componentBacktraceDescription =
-        CKComponentBacktraceDescription(generateComponentBacktrace(supercomponent));
-      NSString *const componentChildrenDescription = CKComponentChildrenDescription(children);
-      [NSException raise:exception.name
-                  format:@"%@ raised %@ during mount: %@\n backtrace:%@ children:%@", [self class], exception.name, exception.reason, componentBacktraceDescription, componentChildrenDescription];
+      CKCFatalWithCategory(NSStringFromClass([self class]),
+                           @"Raised %@ during mount: %@\nBacktrace: %@\nChildren: %@",
+                           exception.name,
+                           exception.reason,
+                           CKComponentBacktraceDescription(CKComponentGenerateBacktrace(supercomponent)),
+                           CKComponentChildrenDescription(children));
     }
 
     _mountInfo->viewContext = {v, {{0,0}, v.bounds.size}};
@@ -245,7 +237,7 @@ struct CKComponentMountInfo {
   } else {
     CKCAssertWithCategory(_mountInfo->view == nil, [self class],
                           @"%@ should not have a mounted %@ after previously being mounted without a view.\n%@",
-                          [self class], [_mountInfo->view class], CKComponentBacktraceDescription(generateComponentBacktrace(self)));
+                          [self class], [_mountInfo->view class], CKComponentBacktraceDescription(CKComponentGenerateBacktrace(self)));
     _mountInfo->viewContext = {effectiveContext.viewManager->view, {effectiveContext.position, size}};
 
     return {.mountChildren = YES, .contextForChildren = effectiveContext};
@@ -254,7 +246,7 @@ struct CKComponentMountInfo {
 
 - (NSString *)backtraceStackDescription
 {
-  return CKComponentBacktraceStackDescription(generateComponentBacktrace(self));
+  return CKComponentBacktraceStackDescription(CKComponentGenerateBacktrace(self));
 }
 
 - (void)unmount
@@ -284,10 +276,9 @@ struct CKComponentMountInfo {
   }
 }
 
-- (void)childrenDidMount:(id<CKSystraceListener>)systraceListener
+- (void)childrenDidMount
 {
   [_scopeHandle.controller componentDidMount:self];
-  [systraceListener didMountComponent:self];
 }
 
 #pragma mark - Animation
@@ -322,6 +313,11 @@ struct CKComponentMountInfo {
 
 - (CKComponentLayout)layoutThatFits:(CKSizeRange)constrainedSize parentSize:(CGSize)parentSize
 {
+#if CK_ASSERTIONS_ENABLED
+  const CKComponentContext<CKComponentCreationValidationContext> validationContext([[CKComponentCreationValidationContext alloc] initWithSource:CKComponentCreationValidationSourceLayout]);
+#endif
+
+  CKAssertSizeRange(constrainedSize);
   CK::Component::LayoutContext context(self, constrainedSize);
   auto const systraceListener = context.systraceListener;
   [systraceListener willLayoutComponent:self];
@@ -338,17 +334,18 @@ struct CKComponentMountInfo {
     auto const childrenSize = layout.children->size();
     CKAssertWithCategory(childrenSize == 0,
                          NSStringFromClass([self class]),
-                         @"%@ is subclassing CKComponent directly, you need to subclass %@ instead. "
-                         "Context: we’re phasing out CKComponent subclasses for in favor of CKRenderLayoutComponent/CKRenderLayoutWithChildrenComponent subclasses. "
+                         @"%@ is subclassing CKComponent directly, you need to subclass CKLayoutComponent instead. "
+                         "Context: we’re phasing out CKComponent subclasses for in favor of CKLayoutComponent subclasses. "
                          "While this is still kinda OK for leaf components, things start to break when you introduce a CKComponent subclass with children.",
-                         [self class],
-                         (childrenSize == 1 ? @"CKRenderLayoutComponent" : @"CKRenderLayoutWithChildrenComponent"));
+                         [self class]);
   }
-#endif
 
   CKAssert(layout.component == self, @"Layout computed by %@ should return self as component, but returned %@",
            [self class], [layout.component class]);
+
+  CKAssertResolvedSize(_size, parentSize);
   CKSizeRange resolvedRange __attribute__((unused)) = constrainedSize.intersect(_size.resolve(parentSize));
+  CKAssertSizeRange(resolvedRange);
   CKAssertWithCategory(CKIsGreaterThanOrEqualWithTolerance(resolvedRange.max.width, layout.size.width)
                        && CKIsGreaterThanOrEqualWithTolerance(layout.size.width, resolvedRange.min.width)
                        && CKIsGreaterThanOrEqualWithTolerance(resolvedRange.max.height,layout.size.height)
@@ -357,6 +354,7 @@ struct CKComponentMountInfo {
                        @"Computed size %@ for %@ does not fall within constrained size %@\n%@",
                        NSStringFromCGSize(layout.size), [self class], resolvedRange.description(),
                        CK::Component::LayoutContext::currentStackDescription());
+#endif
 
   [systraceListener didLayoutComponent:self];
 
@@ -367,6 +365,7 @@ struct CKComponentMountInfo {
                           restrictedToSize:(const CKComponentSize &)size
                       relativeToParentSize:(CGSize)parentSize
 {
+  CKAssertResolvedSize(_size, parentSize);
   CKSizeRange resolvedRange = constrainedSize.intersect(_size.resolve(parentSize));
   return [self computeLayoutThatFits:resolvedRange];
 }
@@ -386,7 +385,10 @@ struct CKComponentMountInfo {
 - (id)nextResponderAfterController
 {
   CKAssertMainThread();
-  return (_mountInfo ? _mountInfo->supercomponent : nil) ?: [self rootComponentMountedView];
+  if (_mountInfo && _mountInfo->supercomponent) {
+    return _mountInfo->supercomponent;
+  }
+  return [self rootComponentMountedView];
 }
 
 - (id)targetForAction:(SEL)action withSender:(id)sender
@@ -414,6 +416,18 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
   return ck_objc_getAssociatedWeakObject(self, kRootComponentMountedViewKey);
 }
 
+#pragma mark - CKMountable
+
+- (unsigned int)numberOfChildren
+{
+  return 0;
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return nil;
+}
+
 #pragma mark - CKComponentProtocol
 
 + (Class<CKComponentControllerProtocol>)controllerClass
@@ -434,34 +448,12 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
   return nil;
 }
 
-+ (BOOL)requiresScopeHandle
-{
-  const Class componentClass = self;
-
-  static CK::StaticMutex mutex = CK_MUTEX_INITIALIZER; // protects cache
-  CK::StaticMutexLocker l(mutex);
-
-  static std::unordered_map<Class, BOOL> *cache = new std::unordered_map<Class, BOOL>();
-  const auto &it = cache->find(componentClass);
-  if (it == cache->end()) {
-    BOOL hasAnimations = NO;
-    if (CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsFromPreviousComponent:)) ||
-        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnInitialMount)) ||
-        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnFinalUnmount))) {
-      hasAnimations = YES;
-    }
-    cache->insert({componentClass, hasAnimations});
-    return hasAnimations;
-  }
-  return it->second;
-}
-
 #pragma mark - State
 
 - (void)updateState:(id (^)(id))updateBlock mode:(CKUpdateMode)mode
 {
-  CKAssertNotNil(_scopeHandle, @"A component without state cannot update its state.");
-  CKAssertNotNil(updateBlock, @"Cannot enqueue component state modification with a nil update block.");
+  CKAssertWithCategory(_scopeHandle != nil, [self class], @"A component without state cannot update its state.");
+  CKAssertWithCategory(updateBlock != nil, [self class], @"Cannot enqueue component state modification with a nil update block.");
   [_scopeHandle updateState:updateBlock metadata:{} mode:mode];
 }
 
@@ -470,7 +462,7 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
   return _scopeHandle.controller;
 }
 
-- (id<NSObject>)scopeFrameToken
+- (id<NSObject>)uniqueIdentifier
 {
   return _scopeHandle ? @(_scopeHandle.globalIdentifier) : nil;
 }
@@ -485,20 +477,32 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
   return currentScope->newScopeRoot;
 }
 
-static NSArray<CKComponent *> *generateComponentBacktrace(CKComponent *component)
-{
-  NSMutableArray<CKComponent *> *const componentBacktrace = [NSMutableArray arrayWithObject:component];
-  while ([componentBacktrace lastObject]
-         && [componentBacktrace lastObject]->_mountInfo
-         && [componentBacktrace lastObject]->_mountInfo->supercomponent) {
-    [componentBacktrace addObject:[componentBacktrace lastObject]->_mountInfo->supercomponent];
-  }
-  return componentBacktrace;
-}
-
 - (UIView *)mountedView
 {
   return _mountInfo ? _mountInfo->view : nil;
+}
+
+- (CKMountInfo)mountInfo
+{
+  if (_mountInfo) {
+    return *_mountInfo.get();
+  }
+  return {};
+}
+
+- (id)state
+{
+  return _scopeHandle.state;
+}
+
+- (NSString *)debugName
+{
+  return NSStringFromClass(self.class);
+}
+
++ (BOOL)shouldUpdateComponentInController
+{
+  return NO;
 }
 
 @end

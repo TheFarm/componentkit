@@ -35,7 +35,10 @@
 + (CKComponent *)componentForModel:(id<NSObject>)model context:(id<NSObject>)context
 {
   const CGSize size = [(NSValue *)model CGSizeValue];
-  return [CKComponent newWithView:{} size:{size.width, size.height}];
+  return CK::ComponentBuilder()
+             .width(size.width)
+             .height(size.height)
+             .build();
 }
 
 - (void)setUp
@@ -724,7 +727,7 @@ static NSValue *sizeValue(CGFloat width, CGFloat height)
 
 #pragma mark - CKDataSourceListener
 
-- (void)componentDataSource:(CKDataSource *)dataSource
+- (void)dataSource:(CKDataSource *)dataSource
      didModifyPreviousState:(CKDataSourceState *)previousState
                   withState:(CKDataSourceState *)state
           byApplyingChanges:(CKDataSourceAppliedChanges *)changes
@@ -733,7 +736,7 @@ static NSValue *sizeValue(CGFloat width, CGFloat height)
   _currentDataSourceState = state;
 }
 
-- (void)componentDataSource:(CKDataSource *)dataSource
+- (void)dataSource:(CKDataSource *)dataSource
  willApplyDeferredChangeset:(CKDataSourceChangeset *)deferredChangeset {}
 
 @end

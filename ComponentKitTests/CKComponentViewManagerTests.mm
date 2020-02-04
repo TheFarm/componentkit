@@ -10,11 +10,12 @@
 
 #import <XCTest/XCTest.h>
 
-#import "ComponentViewManager.h"
-#import "ComponentViewReuseUtilities.h"
-
+#import <ComponentKit/ComponentViewManager.h>
+#import <ComponentKit/ComponentViewReuseUtilities.h>
+#import <ComponentKit/CKCasting.h>
 #import <ComponentKit/CKComponent.h>
 #import <ComponentKit/CKComponentInternal.h>
+#import <ComponentKit/CKCompositeComponent.h>
 
 using CK::Component::ViewManager;
 
@@ -26,11 +27,19 @@ using CK::Component::ViewManager;
 @property (nonatomic, assign) NSUInteger numberOfSubviewsAdded;
 @end
 
+/** View provides `didEnterReusePool` callback */
+@interface CKTestReusableView : UIView
+@property (nonatomic, readonly, assign) BOOL isDidEnterReusePoolCalled;
+- (void)didEnterReusePool;
+@end
+
 @implementation CKComponentViewManagerTests
 
 - (void)testThatComponentViewManagerVendsRecycledView
 {
-  CKComponent *component = [CKComponent newWithView:{[UIView class], {}} size:{}];
+  CKComponent *component = CK::ComponentBuilder()
+                               .viewClass([UIView class])
+                               .build();
 
   UIView *container = [[UIView alloc] init];
   CK::Component::ViewReuseUtilities::mountingInRootView(container);
@@ -48,7 +57,9 @@ using CK::Component::ViewManager;
 
 - (void)testThatComponentViewManagerHidesViewIfItWasNotRecycled
 {
-  CKComponent *component = [CKComponent newWithView:{[UIView class], {}} size:{}];
+  CKComponent *component = CK::ComponentBuilder()
+                               .viewClass([UIView class])
+                               .build();
 
   UIView *container = [[UIView alloc] init];
   CK::Component::ViewReuseUtilities::mountingInRootView(container);
@@ -79,8 +90,12 @@ static NSArray *arrayByPerformingBlock(NSArray *array, id (^block)(id))
 
 - (void)testThatComponentViewManagerReordersViewsIfOrderSwapped
 {
-  CKComponent *imageView = [CKComponent newWithView:{[UIImageView class], {}} size:{}];
-  CKComponent *button = [CKComponent newWithView:{[UIButton class], {}} size:{}];
+  CKComponent *imageView = CK::ComponentBuilder()
+                               .viewClass([UIImageView class])
+                               .build();
+  CKComponent *button = CK::ComponentBuilder()
+                            .viewClass([UIButton class])
+                            .build();
   NSArray *actualClasses, *expectedClasses;
 
   UIView *container = [[UIView alloc] init];
@@ -106,8 +121,12 @@ static NSArray *arrayByPerformingBlock(NSArray *array, id (^block)(id))
 
 - (void)testThatComponentViewManagerDoesNotUnnecessarilyReorderViews
 {
-  CKComponent *imageView = [CKComponent newWithView:{[UIImageView class], {}} size:{}];
-  CKComponent *button = [CKComponent newWithView:{[UIButton class], {}} size:{}];
+  CKComponent *imageView = CK::ComponentBuilder()
+                               .viewClass([UIImageView class])
+                               .build();
+  CKComponent *button = CK::ComponentBuilder()
+                            .viewClass([UIButton class])
+                            .build();
 
   CKAddSubviewOnlyView *container = [[CKAddSubviewOnlyView alloc] init];
   CK::Component::ViewReuseUtilities::mountingInRootView(container);
@@ -127,9 +146,10 @@ static NSArray *arrayByPerformingBlock(NSArray *array, id (^block)(id))
 - (void)testThatGettingRecycledViewForComponentDoesNotRecycleViewWithDisjointAttributes
 {
   CKComponent *bgColorComponent =
-  [CKComponent newWithView:{[UIView class], {
-    {{@selector(setBackgroundColor:), [UIColor blueColor]}}
-  }} size:{}];
+  CK::ComponentBuilder()
+      .viewClass([UIView class])
+      .backgroundColor([UIColor blueColor])
+      .build();
 
   UIView *container = [[UIView alloc] init];
   CK::Component::ViewReuseUtilities::mountingInRootView(container);
@@ -141,9 +161,10 @@ static NSArray *arrayByPerformingBlock(NSArray *array, id (^block)(id))
   }
 
   CKComponent *alphaComponent =
-  [CKComponent newWithView:{[UIView class], {
-    {{@selector(setAlpha:), @0.5}}
-  }} size:{}];
+  CK::ComponentBuilder()
+      .viewClass([UIView class])
+      .alpha(0.5)
+      .build();
 
   {
     ViewManager m(container);
@@ -160,12 +181,73 @@ static UIView *imageViewFactory()
 - (void)testThatGettingViewForViewComponentWithNilViewClassCallsClassMethodNewView
 {
   CKComponentViewClass customClass(&imageViewFactory);
-  CKComponent *testComponent = [CKComponent newWithView:{std::move(customClass), {}} size:{}];
+  CKComponent *testComponent = CK::ComponentBuilder()
+                                   .viewClass(std::move(customClass))
+                                   .build();
   UIView *container = [[UIView alloc] init];
   CK::Component::ViewReuseUtilities::mountingInRootView(container);
   ViewManager m(container);
   UIView *subview = m.viewForConfiguration([testComponent class], [testComponent viewConfiguration]);
   XCTAssertTrue([subview isKindOfClass:[UIImageView class]], @"Expected +newView to vend a UIImageView");
+}
+
+- (void)testThatViewsInViewPoolAreHiddenAndDidHideIsCalledInDescendantAfterHideAllIsCalledOnRootView
+{
+  CKComponent *childComponent =
+  CK::ComponentBuilder()
+      .viewClass({[CKTestReusableView class], @selector(didEnterReusePool), nil})
+      .build();
+  CKComponent *component =
+  [CKCompositeComponent
+   newWithView:{{[CKTestReusableView class], @selector(didEnterReusePool), nil}}
+   component:childComponent];
+
+  UIView *container = [[UIView alloc] init];
+  CK::Component::ViewReuseUtilities::mountingInRootView(container);
+  {
+    ViewManager m1(container);
+    const auto subview = m1.viewForConfiguration([component class], [component viewConfiguration]);
+    {
+      ViewManager m2(subview);
+      m2.viewForConfiguration([childComponent class], [childComponent viewConfiguration]);
+    }
+  }
+
+  // All subviews should be visible after view manager is reset
+  NSInteger numberOfViewsVisible = 0;
+  checkSubviewsAreHidden(container, NO, &numberOfViewsVisible);
+  XCTAssertEqual(numberOfViewsVisible, 2);
+
+  CK::Component::ViewReusePool::hideAll(container, nullptr);
+  // Only views in the view pool of `container` are hidden since there is no need to `setHidden` for their descendant.
+  NSInteger numberOfViewsHidden = 0;
+  checkSubviewsAreHidden(container, YES, &numberOfViewsHidden);
+  XCTAssertEqual(numberOfViewsHidden, 1);
+
+  // Although `setHidden` is not needed to be called on all descendant, calling `didEnterReusePool` is necessary
+  // because we need to notify all views in the hierarchy that they did enter reuse pool.
+  XCTAssertTrue(isDidEnterReusePoolIsCalledOnDescendant(container));
+}
+
+static void checkSubviewsAreHidden(UIView *view, BOOL isHidden, NSInteger *numberOfViewsMatched)
+{
+  for (UIView *subview in view.subviews) {
+    if (subview.isHidden == isHidden) {
+      (*numberOfViewsMatched)++;
+    }
+    checkSubviewsAreHidden(subview, isHidden, numberOfViewsMatched);
+  }
+}
+
+static BOOL isDidEnterReusePoolIsCalledOnDescendant(UIView *view)
+{
+  for (UIView *subview in view.subviews) {
+    const auto reusableView = CK::objCForceCast<CKTestReusableView>(subview);
+    if (!reusableView.isDidEnterReusePoolCalled) {
+      return NO;
+    }
+  }
+  return YES;
 }
 
 @end
@@ -206,6 +288,15 @@ static UIView *imageViewFactory()
 - (void)insertSubview:(UIView *)view atIndex:(NSInteger)index
 {
   [NSException raise:NSGenericException format:@"Unexpected %@", NSStringFromSelector(_cmd)];
+}
+
+@end
+
+@implementation CKTestReusableView
+
+- (void)didEnterReusePool
+{
+  _isDidEnterReusePoolCalled = YES;
 }
 
 @end

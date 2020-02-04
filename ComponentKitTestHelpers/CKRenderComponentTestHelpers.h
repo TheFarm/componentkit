@@ -14,7 +14,6 @@
 #import <ComponentKit/CKComponentController.h>
 #import <ComponentKit/CKFlexboxComponent.h>
 #import <ComponentKit/CKRenderComponent.h>
-#import <ComponentKit/CKRenderWithChildrenComponent.h>
 
 // Leaf render component with component controller.
 struct CKTestChildRenderComponentProps {
@@ -27,10 +26,17 @@ struct CKTestChildRenderComponentProps {
 + (instancetype)newWithProps:(const CKTestChildRenderComponentProps &)props;
 @end
 
+// CKCompositeComponent with scope and state.
+@interface CKCompositeComponentWithScopeAndState : CKCompositeComponent
++ (instancetype)newWithComponent:(CKComponent *)component;
+- (CKComponent *)child;
+@end
+
 // Render component with a `CKTestChildRenderComponent` child component.
 struct CKTestRenderComponentProps {
   NSUInteger identifier;
   BOOL shouldUseComponentContext;
+  BOOL shouldUseNonRenderChild;
 };
 
 @interface CKTestRenderComponent : CKRenderComponent
@@ -38,11 +44,8 @@ struct CKTestRenderComponentProps {
 @property (nonatomic, assign) NSUInteger renderCalledCounter;
 @property (nonatomic, assign) NSUInteger identifier;
 @property (nonatomic, strong) CKTestChildRenderComponent *childComponent;
+@property (nonatomic, strong) CKCompositeComponentWithScopeAndState *nonRenderChildComponent;
 + (instancetype)newWithProps:(const CKTestRenderComponentProps &)props;
-@end
-
-// CKCompositeComponent with scope and state.
-@interface CKCompositeComponentWithScopeAndState : CKCompositeComponent
 @end
 
 // Render component with CKCompositeComponentWithScopeAndState child
@@ -51,11 +54,15 @@ struct CKTestRenderComponentProps {
 @property (nonatomic, strong) CKCompositeComponentWithScopeAndState *childComponent;
 @end
 
-// An helper class that inherits from 'CKRenderWithChildrenComponent'; render the component froms the initializer
-@interface CKTestRenderWithChildrenComponent : CKRenderWithChildrenComponent
+// A helper class that inherits from 'CKTestLayoutComponent'; render the component froms the initializer
+@interface CKTestLayoutComponent : CKLayoutComponent
 + (instancetype)newWithChildren:(std::vector<CKComponent *>)children;
 @end
 
 // Component controller
 @interface CKTestChildRenderComponentController : CKComponentController
+@end
+
+@interface CKCompositeComponentWithScope : CKCompositeComponent
++ (instancetype)newWithComponentProvider:(CKComponent *(^)())componentProvider;
 @end

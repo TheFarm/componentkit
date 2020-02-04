@@ -16,7 +16,7 @@
 #import <ComponentKit/CKComponentSubclass.h>
 #import <ComponentKit/CKComponentLayout.h>
 #import <ComponentKit/CKComponentProvider.h>
-#import <ComponentKit/CKDataSource.h>
+#import <ComponentKit/CKDataSourceInternal.h>
 #import <ComponentKit/CKDataSourceItem.h>
 #import <ComponentKit/CKDataSourceState.h>
 #import <ComponentKit/CKDataSourceListener.h>
@@ -83,9 +83,20 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   }));
 }
 
+- (void)testStateUpdatesAreNotProcessedIfShouldPauseStateUpdatesIsYes
+{
+  _dataSource = CKComponentTestDataSource(ComponentProvider, self);
+  _dataSource.shouldPauseStateUpdates = YES;
+  const auto state1 = _dataSource.state;
+  [self _updateStates:@[@"Test"] mode:CKUpdateModeSynchronous];
+  XCTAssertEqual(_dataSource.state, state1);
+  _dataSource.shouldPauseStateUpdates = NO;
+  XCTAssertNotEqual(_dataSource.state, state1);
+}
+
 #pragma mark - CKDataSourceListener
 
-- (void)componentDataSource:(CKDataSource *)dataSource
+- (void)dataSource:(CKDataSource *)dataSource
      didModifyPreviousState:(CKDataSourceState *)previousState
                   withState:(CKDataSourceState *)state
           byApplyingChanges:(CKDataSourceAppliedChanges *)changes
@@ -93,7 +104,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   _state = state;
 }
 
-- (void)componentDataSource:(CKDataSource *)dataSource
+- (void)dataSource:(CKDataSource *)dataSource
  willApplyDeferredChangeset:(CKDataSourceChangeset *)deferredChangeset
 {
 }
@@ -106,7 +117,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
     return _state != nil;
   });
   CKDataSourceItem *const item = [_state objectAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:0]];
-  CKComponent *const component = [item rootLayout].component();
+  CKComponent *const component = (CKComponent *)[item rootLayout].component();
   for (id state in states) {
     [component updateState:^(id oldState){return state;} mode:mode];
   }

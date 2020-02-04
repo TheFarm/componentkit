@@ -22,10 +22,10 @@
 #import <ComponentKit/CKComponentControllerProtocol.h>
 #import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKRenderComponent.h>
+#import <ComponentKit/CKRootTreeNode.h>
 #import <ComponentKit/CKThreadLocalComponentScope.h>
-#import <ComponentKit/CKTreeNode.h>
 
-#import "CKScopeTreeNode.h"
+#import <ComponentKit/CKTreeNode.h>
 
 @protocol TestScopedProtocol <NSObject>
 @end
@@ -53,16 +53,10 @@
 {
   return [super init];
 }
+- (id<CKComponentProtocol>)component { return [CKComponent new]; }
 @end
 
 @interface CKComponentScopeTests : XCTestCase
-{
-  @package
-  CKUnifyComponentTreeConfig _unifyComponentTrees;
-}
-@end
-
-@interface CKComponentScopeWithTreeNodeTests : CKComponentScopeTests
 @end
 
 @implementation CKComponentScopeTests
@@ -76,21 +70,21 @@
 
 - (void)testThreadLocalComponentScopeIsNotEmptyWhenTheScopeExists
 {
-  CKThreadLocalComponentScope threadScope(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(CKComponentScopeRootWithDefaultPredicates(nil, nil), {});
   XCTAssertTrue(CKThreadLocalComponentScope::currentScope() != nullptr);
 }
 
 - (void)testThreadLocalComponentScopeStoresTheProvidedFrameAsTheEquivalentPreviousFrame
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
-  XCTAssertEqualObjects(CKThreadLocalComponentScope::currentScope()->stack.top().previousFrame, root.rootFrame);
+  CKThreadLocalComponentScope threadScope(root, {});
+  XCTAssertEqualObjects(CKThreadLocalComponentScope::currentScope()->stack.top().previousFrame, root.rootNode.node());
 }
 
 - (void)testThreadLocalComponentScopePushesChildComponentScope
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
   id<CKComponentScopeFrameProtocol> rootFrame = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
   CKComponentScope scope([CKCompositeComponent class]);
   id<CKComponentScopeFrameProtocol> currentFrame = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
@@ -101,11 +95,11 @@
 {
   {
     CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-    CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root, {});
 
     {
       CKComponentScopeRoot *root2 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-      CKThreadLocalComponentScope threadScope2(root2, {}, _unifyComponentTrees);
+      CKThreadLocalComponentScope threadScope2(root2, {});
       XCTAssertEqual(CKThreadLocalComponentScope::currentScope(), &threadScope2);
     }
 
@@ -120,103 +114,13 @@
 - (void)testComponentScopeFrameIsPoppedWhenComponentScopeCloses
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
   id<CKComponentScopeFrameProtocol> rootFrame = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
   {
     CKComponentScope scope([CKCompositeComponent class], @"moose");
     XCTAssertTrue(CKThreadLocalComponentScope::currentScope()->stack.top().frame != rootFrame);
   }
   XCTAssertEqual(CKThreadLocalComponentScope::currentScope()->stack.top().frame, rootFrame);
-}
-
-- (void)testComponentScopeFramePreserveChildrenWithRenderComponent
-{
-  CKComponentScopeRoot *previousRoot = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKComponentScopeRoot *newRoot;
-  CKComponentScopeHandle *innerComponentHandle;
-  
-  // Simulate component creation with 3 components: CKCompositeComponent -> CKRenderComponent -> CKComponent
-  {
-    // Create root component
-    CKThreadLocalComponentScope threadScope(previousRoot, {}, _unifyComponentTrees);
-    newRoot = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-    id<CKComponentScopeFrameProtocol> f1 = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
-    
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot.rootNode.node()
-                                              previousParent:nil
-                                                   scopeRoot:newRoot
-                                                stateUpdates:{}];
-    [CKComponentScopeFrame willBuildComponentTreeWithTreeNode:node];
-    
-    XCTAssertTrue(CKThreadLocalComponentScope::currentScope()->stack.top().frame != f1);
-    id<CKComponentScopeFrameProtocol> f2 = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
-    {
-      // Create child component
-      CKComponentScope innerScope([CKComponent class], @"macaque", ^{
-        return @1;
-      });
-      
-      innerComponentHandle = innerScope.scopeHandle();
-      
-      XCTAssertTrue(CKThreadLocalComponentScope::currentScope()->stack.top().frame != f2);
-    }
-    
-    [CKComponentScopeFrame didBuildComponentTreeWithNode:node];
-  }
-  
-  // Simulate component creation whe the render one is being reused.
-  CKComponentScopeRoot *newRoot2;
-  {
-    CKThreadLocalComponentScope threadScope(newRoot, {}, _unifyComponentTrees);
-    newRoot2 = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-    
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot2.rootNode.node()
-                                              previousParent:newRoot.rootNode.node()
-                                                   scopeRoot:newRoot2
-                                                stateUpdates:{}];
-    
-    [CKComponentScopeFrame didReuseRenderWithTreeNode:node];
-  }
-  
-  // Simulate component creation with 3 a state update on the leaf and make sure it get the correct value.
-  CKComponentStateUpdateMap stateUpdates;
-  NSNumber *newState = @2;
-  stateUpdates[innerComponentHandle].push_back(^(id){
-    return newState;
-  });
-  
-  CKComponentScopeRoot *newRoot3;
-  {
-    // Create root component
-    CKThreadLocalComponentScope threadScope(newRoot2, stateUpdates);
-    newRoot3 = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-    
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot3.rootNode.node()
-                                              previousParent:newRoot2.rootNode.node()
-                                                   scopeRoot:newRoot3
-                                                stateUpdates:stateUpdates];
-    [CKComponentScopeFrame willBuildComponentTreeWithTreeNode:node];
-    {
-      // Create child component
-      CKComponentScope innerScope([CKComponent class], @"macaque", ^{
-        return @1;
-      });
-      
-      NSNumber *stateFromScope = innerScope.state();
-      XCTAssertTrue(stateFromScope == newState);
-    }
-    
-    [CKComponentScopeFrame didBuildComponentTreeWithNode:node];
-  }
 }
 
 #pragma mark - Component Scope State
@@ -226,14 +130,14 @@
   CKComponentScopeRoot *root1 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   CKComponentScopeRoot *root2;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque", ^{ return @42; });
     }
     root2 = CKThreadLocalComponentScope::currentScope()->newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       // This block should never be called. We should inherit the previous scope.
       BOOL __block blockCalled = NO;
@@ -253,7 +157,7 @@
   CKComponentScopeRoot *root1 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   CKComponentScopeRoot *root2;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque", ^{ return @42; });
       CKComponentScope::replaceState(scope, @100);
@@ -262,7 +166,7 @@
     root2 = CKThreadLocalComponentScope::currentScope()->newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque", ^{ return @365; });
       XCTAssertEqualObjects(scope.state(), @100);
@@ -275,7 +179,7 @@
   CKComponentScopeRoot *root1 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   CKComponentScopeRoot *root2;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"spongebob", ^{ return @"FUN"; });
       id __unused state = scope.state();
@@ -287,7 +191,7 @@
     root2 = CKThreadLocalComponentScope::currentScope()->newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       // This block should never be called. We should inherit the previous scope.
       CKComponentScope scope([CKCompositeComponent class], @"spongebob", ^{ return @"rotlf-nope!"; });
@@ -308,7 +212,7 @@
   CKComponentScopeRoot *root1 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   CKComponentScopeRoot *root2;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"Quoth", ^{ return @"nevermore"; });
       id __unused state = scope.state();
@@ -320,7 +224,7 @@
     root2 = CKThreadLocalComponentScope::currentScope()->newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       // This block should never be called. We should inherit the previous scope.
       CKComponentScope scope([CKCompositeComponent class], @"Quoth", ^{ return @"Lenore"; });
@@ -335,6 +239,21 @@
   }
 }
 
+#pragma mark - Test Component Scope Identifier
+
+- (void)testComponentScopeIdentifierIsSameAsScopeHandleGlobalIdentifier
+{
+  CKComponentScopeRoot *root1 = CKComponentScopeRootWithDefaultPredicates(nil, nil);
+  {
+    CKThreadLocalComponentScope threadScope(root1, {});
+    {
+      CKComponentScope scope([CKCompositeComponent class], @"macaque");
+      int32_t globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
+      XCTAssertEqual(globalIdentifier, scope.identifier());
+    }
+  }
+}
+
 #pragma mark - Component Scope Handle Global Identifier
 
 - (void)testComponentScopeHandleGlobalIdentifierIsAcquiredFromPreviousComponentScopeOneLevelDown
@@ -343,18 +262,18 @@
   CKComponentScopeRoot *root2;
   int32_t globalIdentifier;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque");
-      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier;
+      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
     }
     root2 = CKThreadLocalComponentScope::currentScope()->newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque");
-      XCTAssertEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier);
+      XCTAssertEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier);
     }
   }
 }
@@ -363,15 +282,15 @@
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   {
-    CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root, {});
     int32_t globalIdentifier;
     {
       CKComponentScope scope([CKCompositeComponent class], @"moose");
-      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier;
+      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
     }
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque");
-      XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier);
+      XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier);
     }
   }
 }
@@ -380,15 +299,15 @@
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   {
-    CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root, {});
     int32_t globalIdentifier;
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque");
-      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier;
+      globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
     }
     {
       CKComponentScope scope([CKCompositeComponent class], @"macaque");
-      XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier);
+      XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier);
     }
   }
 }
@@ -397,20 +316,20 @@
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
   {
-    CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root, {});
     int32_t globalIdentifier;
     {
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
         CKComponentScope scope2([CKCompositeComponent class], @"moose");
-        globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier;
+        globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
       }
     }
     {
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
         CKComponentScope scope2([CKCompositeComponent class], @"moose");
-        XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier);
+        XCTAssertNotEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier);
       }
     }
   }
@@ -422,7 +341,7 @@
   CKComponentScopeRoot *root2;
   int32_t globalIdentifier;
   {
-    CKThreadLocalComponentScope threadScope(root1, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root1, {});
     {
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
@@ -433,13 +352,13 @@
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
         CKComponentScope scope2([CKCompositeComponent class], @"moose");
-        globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier;
+        globalIdentifier = CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier;
       }
     }
     root2 = threadScope.newScopeRoot;
   }
   {
-    CKThreadLocalComponentScope threadScope(root2, {}, _unifyComponentTrees);
+    CKThreadLocalComponentScope threadScope(root2, {});
     {
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
@@ -450,7 +369,7 @@
       CKComponentScope scope1([CKCompositeComponent class], @"macaque");
       {
         CKComponentScope scope2([CKCompositeComponent class], @"moose");
-        XCTAssertEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.handle.globalIdentifier);
+        XCTAssertEqual(globalIdentifier, CKThreadLocalComponentScope::currentScope()->stack.top().frame.scopeHandle.globalIdentifier);
       }
     }
   }
@@ -468,7 +387,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
                                 analyticsListener:nil
                                 componentPredicates:{&testComponentProtocolPredicate}
                                 componentControllerPredicates:{}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithScopedProtocol *c = [TestComponentWithScopedProtocol new];
   [root registerComponent:c];
@@ -489,7 +408,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {&testComponentProtocolPredicate}, {});
 
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithScopedProtocol *c = [TestComponentWithScopedProtocol new];
   [root registerComponent:c];
@@ -513,26 +432,26 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
                                 analyticsListener:nil
                                 componentPredicates:{&testComponentProtocolPredicate}
                                 componentControllerPredicates:{}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
-  
+  CKThreadLocalComponentScope threadScope(root, {});
+
   TestComponentWithScopedProtocol *c = [TestComponentWithScopedProtocol new];
   [root registerComponent:c];
   [root registerComponent:c];
-  
+
   __block NSInteger numberOfComponents = 0;
   [root
    enumerateComponentsMatchingPredicate:&testComponentProtocolPredicate
    block:^(id<CKComponentProtocol> component) {
      ++numberOfComponents;
    }];
-  
+
   XCTAssert(numberOfComponents == 1, @"Should have deduplicate the component");
 }
 
 - (void)testComponentScopeRootFactoryRegisteringDuplicateProtocolComponent
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {&testComponentProtocolPredicate}, {});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithScopedProtocol *c = [TestComponentWithScopedProtocol new];
   [root registerComponent:c];
@@ -555,7 +474,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
                                 analyticsListener:nil
                                 componentPredicates:{&testComponentProtocolPredicate}
                                 componentControllerPredicates:{}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithScopedProtocol *c1 = [TestComponentWithScopedProtocol new];
   [root registerComponent:c1];
@@ -581,7 +500,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
 - (void)testComponentScopeRootFactoryRegisteringMultipleProtocolComponentFindsBothComponentsWhenEnumerating
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {&testComponentProtocolPredicate}, {});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithScopedProtocol *c1 = [TestComponentWithScopedProtocol new];
   [root registerComponent:c1];
@@ -611,7 +530,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
                                 analyticsListener:nil
                                 componentPredicates:{&testComponentProtocolPredicate}
                                 componentControllerPredicates:{}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithoutScopedProtocol *c = [TestComponentWithoutScopedProtocol new];
   [root registerComponent:c];
@@ -626,7 +545,7 @@ static BOOL testComponentProtocolPredicate(id<CKComponentProtocol> component)
 - (void)testComponentScopeRootFactoryRegisteringNonProtocolComponentFindsNoComponentsWhenEnumerating
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {&testComponentProtocolPredicate}, {});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentWithoutScopedProtocol *c = [TestComponentWithoutScopedProtocol new];
   [root registerComponent:c];
@@ -650,7 +569,7 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
                                 analyticsListener:nil
                                 componentPredicates:{}
                                 componentControllerPredicates:{&testComponentControllerProtocolPredicate}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentControllerWithScopedProtocol *c = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c];
@@ -670,7 +589,7 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
 - (void)testComponentScopeRootFactoryRegisteringProtocolComponentControllerFindsThatControllerWhenEnumerating
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {}, {&testComponentControllerProtocolPredicate});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentControllerWithScopedProtocol *c = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c];
@@ -694,26 +613,26 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
                                 analyticsListener:nil
                                 componentPredicates:{}
                                 componentControllerPredicates:{&testComponentControllerProtocolPredicate}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
-  
+  CKThreadLocalComponentScope threadScope(root, {});
+
   TestComponentControllerWithScopedProtocol *c = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c];
   [root registerComponentController:c];
-  
+
   __block NSInteger numberOfComponentControllers = 0;
   [root
    enumerateComponentControllersMatchingPredicate:&testComponentControllerProtocolPredicate
    block:^(id<CKComponentControllerProtocol> componentController) {
      ++numberOfComponentControllers;
    }];
-  
+
   XCTAssert(numberOfComponentControllers == 1, @"Should have deduplicate the component controller");
 }
 
 - (void)testComponentScopeRootFactoryRegisteringDuplicateProtocolComponentController
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {}, {&testComponentControllerProtocolPredicate});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentControllerWithScopedProtocol *c = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c];
@@ -736,7 +655,7 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
                                 analyticsListener:nil
                                 componentPredicates:{}
                                 componentControllerPredicates:{&testComponentControllerProtocolPredicate}];
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentControllerWithScopedProtocol *c1 = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c1];
@@ -762,7 +681,7 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
 - (void)testComponentScopeRootFactoryRegisteringMultipleProtocolComponentControllersFindsBothControllersWhenEnumerating
 {
   CKComponentScopeRoot *root = CKComponentScopeRootWithPredicates(nil, nil, {}, {&testComponentControllerProtocolPredicate});
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
+  CKThreadLocalComponentScope threadScope(root, {});
 
   TestComponentControllerWithScopedProtocol *c1 = [TestComponentControllerWithScopedProtocol new];
   [root registerComponentController:c1];
@@ -785,110 +704,6 @@ static BOOL testComponentControllerProtocolPredicate(id<CKComponentControllerPro
   XCTAssert(foundC1 && foundC2, @"Should have enumerated and found the input controllers");
 }
 
-@end
-
-@implementation CKComponentScopeWithTreeNodeTests
-- (void)setUp
-{
-  _unifyComponentTrees = {.enable = YES};
-}
-
-- (void)testThreadLocalComponentScopeStoresTheProvidedFrameAsTheEquivalentPreviousFrame
-{
-  CKComponentScopeRoot *root = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKThreadLocalComponentScope threadScope(root, {}, _unifyComponentTrees);
-  XCTAssertEqualObjects(CKThreadLocalComponentScope::currentScope()->stack.top().previousFrame, root.rootNode.node());
-}
-
-- (void)testComponentScopeFramePreserveChildrenWithRenderComponent
-{
-  CKComponentScopeRoot *previousRoot = CKComponentScopeRootWithDefaultPredicates(nil, nil);
-  CKComponentScopeRoot *newRoot;
-  CKComponentScopeHandle *innerComponentHandle;
-
-  // Simulate component creation with 3 components: CKCompositeComponent -> CKRenderComponent -> CKComponent
-  {
-    // Create root component
-    CKThreadLocalComponentScope threadScope(previousRoot, {}, _unifyComponentTrees);
-    newRoot = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-    id<CKComponentScopeFrameProtocol> f1 = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
-
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot.rootNode.node()
-                                              previousParent:nil
-                                                   scopeRoot:newRoot
-                                                stateUpdates:{}];
-    [CKScopeTreeNode willBuildComponentTreeWithTreeNode:node];
-
-    XCTAssertTrue(CKThreadLocalComponentScope::currentScope()->stack.top().frame != f1);
-    id<CKComponentScopeFrameProtocol> f2 = CKThreadLocalComponentScope::currentScope()->stack.top().frame;
-    {
-      // Create child component
-      CKComponentScope innerScope([CKComponent class], @"macaque", ^{
-        return @1;
-      });
-
-      innerComponentHandle = innerScope.scopeHandle();
-
-      XCTAssertTrue(CKThreadLocalComponentScope::currentScope()->stack.top().frame != f2);
-    }
-
-    [CKScopeTreeNode didBuildComponentTreeWithNode:node];
-  }
-
-  // Simulate component creation whe the render one is being reused.
-  CKComponentScopeRoot *newRoot2;
-  {
-    CKThreadLocalComponentScope threadScope(newRoot, {}, _unifyComponentTrees);
-    newRoot2 = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot2.rootNode.node()
-                                              previousParent:newRoot.rootNode.node()
-                                                   scopeRoot:newRoot2
-                                                stateUpdates:{}];
-
-    [CKScopeTreeNode didReuseRenderWithTreeNode:node];
-  }
-
-  // Simulate component creation with 3 a state update on the leaf and make sure it get the correct value.
-  CKComponentStateUpdateMap stateUpdates;
-  NSNumber *newState = @2;
-  stateUpdates[innerComponentHandle].push_back(^(id){
-    return newState;
-  });
-
-  CKComponentScopeRoot *newRoot3;
-  {
-    // Create root component
-    CKThreadLocalComponentScope threadScope(newRoot2, stateUpdates, _unifyComponentTrees);
-    newRoot3 = threadScope.newScopeRoot;
-    CKComponentScope scope([CKCompositeComponent class], @"moose");
-
-    // Create render component.
-    CKTreeNode *node = [[CKTreeNode alloc] initWithComponent:[CKRenderComponent new]
-                                                      parent:newRoot3.rootNode.node()
-                                              previousParent:newRoot2.rootNode.node()
-                                                   scopeRoot:newRoot3
-                                                stateUpdates:stateUpdates];
-    [CKScopeTreeNode willBuildComponentTreeWithTreeNode:node];
-    {
-      // Create child component
-      CKComponentScope innerScope([CKComponent class], @"macaque", ^{
-        return @1;
-      });
-
-      NSNumber *stateFromScope = innerScope.state();
-      XCTAssertTrue(stateFromScope == newState);
-    }
-
-    [CKScopeTreeNode didBuildComponentTreeWithNode:node];
-  }
-}
 @end
 
 @interface CKComponentScopeRootTests_RegistrationAndEnumeration: XCTestCase

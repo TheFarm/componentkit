@@ -5,6 +5,10 @@
 //  Created by Fredrik Palm on 2019-08-30.
 //
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <UIKit/UIKit.h>
 #import <ComponentKit/CKComponentBoundsAnimation.h>
 
@@ -19,7 +23,7 @@
  In those cases, you must rely on UITableView's built-in animations.
  - It can only apply a single CKComponentBoundsAnimation. If there are multiple simultaneous updates with differing
  animations, you must choose only one.
- - It may not be well-suited to complex collection view layouts.
+ - It may not be well-suited to complex table view layouts.
  
  If you're implementing a table view data source, call this function just before you call
  [UITableView beginUpdates] wrapped with [UIView +performWithoutAnimation:]. For example:
@@ -34,7 +38,9 @@
  for example, if you determine that the update has no animation, or that all index paths to be animated are offscreen,
  you can skip calling CKComponentBoundsAnimationApplyAfterBatchUpdates entirely.
  */
-id CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(UITableView *tv);
+id CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(UITableView *tv, CGFloat heightChange);
 
 /** @see CKComponentBoundsAnimationPrepareForTableViewBatchUpdates */
 void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const CKComponentBoundsAnimation &animation);
+
+#endif

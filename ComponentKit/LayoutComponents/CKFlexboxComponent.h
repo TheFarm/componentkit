@@ -8,11 +8,15 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <vector>
 
 #import <ComponentKit/CKContainerWrapper.h>
+#import <ComponentKit/CKLayoutComponent.h>
 #import <ComponentKit/CKMacros.h>
-#import <ComponentKit/CKRenderLayoutWithChildrenComponent.h>
 
 typedef NS_ENUM(NSInteger, CKFlexboxDirection) {
   CKFlexboxDirectionColumn,
@@ -162,8 +166,6 @@ private:
 struct CKFlexboxBorder {
   CKFlexboxBorderDimension top;
   CKFlexboxBorderDimension bottom;
-  CKFlexboxBorderDimension left;
-  CKFlexboxBorderDimension right;
   CKFlexboxBorderDimension start;
   CKFlexboxBorderDimension end;
 };
@@ -232,8 +234,6 @@ struct CKFlexboxComponentStyle {
   CKFlexboxDirection direction;
   /** The amount of space between each child. Overriden by any margins on the child in the flex direction */
   CGFloat spacing;
-  /** Margin applied to the container */
-  CKFlexboxSpacing margin;
   /** How children are aligned if there are no flexible children. */
   CKFlexboxJustifyContent justifyContent;
   /** Orientation of children along cross axis */
@@ -255,6 +255,14 @@ struct CKFlexboxComponentStyle {
    The default is to follow the application's layout direction, but you can force a LTR or RTL layout by changing this.
    */
   CKLayoutDirection layoutDirection = CKLayoutDirectionApplicationDirection;
+
+  /**
+   If set to YES and the child component is back by yoga, will reuse the child's yoga node and avoid allocating new one. This will in turn
+   make the yoga trees deeper.
+
+   If set to NO, will allocate a yoga node for every single child even it is backed by yoga as well
+   */
+  BOOL useDeepYogaTrees = NO;
 };
 
 struct CKFlexboxComponentChild {
@@ -338,7 +346,7 @@ extern const struct CKStackComponentLayoutExtraKeys {
  layout configurations and can generate CKFlexboxComponent code for you
 
  */
-@interface CKFlexboxComponent : CKRenderLayoutWithChildrenComponent
+@interface CKFlexboxComponent : CKLayoutComponent
 
 /**
  @param view A view configuration, or {} for no view.
@@ -351,20 +359,11 @@ extern const struct CKStackComponentLayoutExtraKeys {
                       style:(const CKFlexboxComponentStyle &)style
                    children:(CKContainerWrapper<std::vector<CKFlexboxComponentChild>> &&)children;
 
-/**
- @param view A view configuration, or {} for no view.
- @param size A size, or {} for the default size.
- @param style Specifies how children are laid out.
- @param children A vector of children components.
- @param usesDeepYogaTrees A flag to enable deep yoga trees.
- */
-+ (instancetype)newWithView:(const CKComponentViewConfiguration &)view
-                      size:(const CKComponentSize &)size
-                     style:(const CKFlexboxComponentStyle &)style
-                  children:(CKContainerWrapper<std::vector<CKFlexboxComponentChild>> &&)children
-         usesDeepYogaTrees:(BOOL)usesDeepYogaTrees;
-
 + (instancetype)newWithView:(const CKComponentViewConfiguration &)view
                        size:(const CKComponentSize &)size CK_NOT_DESIGNATED_INITIALIZER_ATTRIBUTE;
 
 @end
+
+#import <ComponentKit/FlexboxComponentBuilder.h>
+
+#endif

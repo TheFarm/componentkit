@@ -8,13 +8,16 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <UIKit/UIKit.h>
 
 #import <ComponentKit/CKComponentScopeTypes.h>
-
+#import <ComponentKit/CKTreeNodeProtocol.h>
 #import <vector>
 
-@class CKComponentScopeFrame;
 @class CKComponentScopeHandle;
 @class CKComponentScopeRoot;
 @protocol CKComponentProtocol;
@@ -37,14 +40,9 @@ struct CKComponentScopeFramePair {
                           initialStateCreator:(id (^)(void))initialStateCreator
                                  stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates;
 
-@property (nonatomic, strong, readonly) CKComponentScopeHandle *handle;
+@property (nonatomic, strong, readonly) CKComponentScopeHandle *scopeHandle;
 
 - (size_t)childrenSize;
-
-// Render support
-+ (void)willBuildComponentTreeWithTreeNode:(id<CKTreeNodeProtocol>)node;
-+ (void)didBuildComponentTreeWithNode:(id<CKTreeNodeProtocol>)node;
-+ (void)didReuseRenderWithTreeNode:(id<CKTreeNodeProtocol>)node;
 
 #if DEBUG
 - (NSArray<NSString *> *)debugDescriptionComponents;
@@ -52,10 +50,4 @@ struct CKComponentScopeFramePair {
 
 @end
 
-@interface CKComponentScopeFrame : NSObject <CKComponentScopeFrameProtocol>
-
-@property (nonatomic, strong, readonly) CKComponentScopeHandle *handle;
-
-- (instancetype)initWithHandle:(CKComponentScopeHandle *)handle;
-
-@end
+#endif

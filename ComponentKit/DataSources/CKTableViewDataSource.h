@@ -4,6 +4,9 @@
 //
 //  Created by Fredrik Palm on 2019-08-30.
 //
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
 
 #import <ComponentKit/CKDataSource.h>
 #import <ComponentKit/CKSupplementaryViewDataSource.h>
@@ -78,3 +81,5 @@
  */
 @property (readonly, nonatomic, weak) id<CKTableViewDataSourceDelegate> delegate;
 @end
+
+#endif

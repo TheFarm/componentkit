@@ -28,12 +28,10 @@
 + (CKComponent *)componentForModel:(id<NSObject>)model context:(id<NSObject>)context
 {
   CKComponentScope scope([CKComponent class]);
-  return [CKComponent
-          newWithView:{
-            [UIView class],
-            {{@selector(setBackgroundColor:), scope.state() ?: [UIColor blackColor]}}
-          }
-          size:{}];
+  return CK::ComponentBuilder()
+             .viewClass([UIView class])
+             .backgroundColor(scope.state() ?: [UIColor blackColor])
+             .build();
 }
 
 - (void)testAsynchronouslyUpdatingStateOfComponentEventuallyUpdatesCorrespondingView
@@ -47,7 +45,8 @@
   XCTAssertEqualObjects(componentView.backgroundColor, [UIColor blackColor], @"Expected bg color to initially be black");
 
   const CKComponentLayout &layout = [hostingView mountedLayout];
-  [layout.component updateState:^(id oldState){ return [UIColor redColor]; } mode:CKUpdateModeAsynchronous];
+  CKComponent *c = (CKComponent *)layout.component;
+  [c updateState:^(id oldState){ return [UIColor redColor]; } mode:CKUpdateModeAsynchronous];
 
   XCTAssertTrue(CKRunRunLoopUntilBlockIsTrue(^{
     [hostingView layoutIfNeeded];
@@ -66,8 +65,9 @@
   XCTAssertEqualObjects(componentView.backgroundColor, [UIColor blackColor], @"Expected bg color to initially be black");
 
   const CKComponentLayout &layout = [hostingView mountedLayout];
-  [layout.component updateState:^(id oldState){ return [UIColor redColor]; } mode:CKUpdateModeAsynchronous];
-  [layout.component updateState:^(id oldState){ return oldState; } mode:CKUpdateModeSynchronous];
+  CKComponent *c = (CKComponent *)layout.component;
+  [c updateState:^(id oldState){ return [UIColor redColor]; } mode:CKUpdateModeAsynchronous];
+  [c updateState:^(id oldState){ return oldState; } mode:CKUpdateModeSynchronous];
 
   [hostingView layoutIfNeeded];
   XCTAssertEqualObjects(componentView.backgroundColor, [UIColor redColor],

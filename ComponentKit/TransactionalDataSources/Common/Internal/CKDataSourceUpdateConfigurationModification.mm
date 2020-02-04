@@ -53,6 +53,7 @@ using namespace CKComponentControllerHelper;
 
   NSMutableArray *newSections = [NSMutableArray array];
   NSMutableSet *updatedIndexPaths = [NSMutableSet set];
+  NSMutableArray<CKComponentController *> *addedComponentControllers = [NSMutableArray array];
   NSMutableArray<CKComponentController *> *invalidComponentControllers = [NSMutableArray array];
   [[oldState sections] enumerateObjectsUsingBlock:^(NSArray *items, NSUInteger sectionIdx, BOOL *sectionStop) {
     NSMutableArray *newItems = [NSMutableArray array];
@@ -67,6 +68,11 @@ using namespace CKComponentControllerHelper;
                                                boundsAnimation:[item boundsAnimation]];
       } else {
         newItem = CKBuildDataSourceItem([item scopeRoot], {}, sizeRange, _configuration, [item model], context);
+        for (const auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
+                                                                                                     item.scopeRoot,
+                                                                                                     &CKComponentControllerInitializeEventPredicate)) {
+          [addedComponentControllers addObject:componentController];
+        }
         for (const auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
                                                                                                        item.scopeRoot,
                                                                                                        &CKComponentControllerInvalidateEventPredicate)) {
@@ -94,7 +100,9 @@ using namespace CKComponentControllerHelper;
   return [[CKDataSourceChange alloc] initWithState:newState
                                      previousState:oldState
                                     appliedChanges:appliedChanges
+                                  appliedChangeset:nil
                                  deferredChangeset:nil
+                         addedComponentControllers:addedComponentControllers
                        invalidComponentControllers:invalidComponentControllers];
 }
 

@@ -14,7 +14,6 @@
 #import <ComponentKit/CKCasting.h>
 #import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKComponentScope.h>
-#import <ComponentKit/CKComponentScopeFrame.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
 #import <ComponentKit/CKComponentSubclass.h>
@@ -89,26 +88,23 @@
   UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 100, 100)];
 
   const CKBuildComponentResult firstResult = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
-    return [CKFlexboxComponent
-            newWithView:{}
-            size:{}
-            style:{.alignItems = CKFlexboxAlignItemsStretch}
-            children:{
-              {[CKBoundsAnimationComponent newWithIdentifier:@0], .flexGrow = 1},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .alignItems(CKFlexboxAlignItemsStretch)
+               .child([CKBoundsAnimationComponent newWithIdentifier:@0])
+                   .flexGrow(1)
+               .build();
   });
   const CKComponentLayout firstLayout = [firstResult.component layoutThatFits:{{100, 100}, {100, 100}} parentSize:{}];
   NSSet *firstMountedComponents = CKMountComponentLayout(firstLayout, container, nil, nil).mountedComponents;
 
   const CKBuildComponentResult secondResult = CKBuildComponent(firstResult.scopeRoot, {}, ^{
-    return [CKFlexboxComponent
-            newWithView:{}
-            size:{}
-            style:{.alignItems = CKFlexboxAlignItemsStretch}
-            children:{
-              {[CKBoundsAnimationComponent newWithIdentifier:@0], .flexGrow = 1},
-              {[CKBoundsAnimationComponent newWithIdentifier:@1], .flexGrow = 1},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .alignItems(CKFlexboxAlignItemsStretch)
+               .child([CKBoundsAnimationComponent newWithIdentifier:@0])
+                   .flexGrow(1)
+               .child([CKBoundsAnimationComponent newWithIdentifier:@1])
+                   .flexGrow(1)
+               .build();
   });
   const CKComponentLayout secondLayout = [secondResult.component layoutThatFits:{{100, 100}, {100, 100}} parentSize:{}];
   NSSet *secondMountedComponents = CKMountComponentLayout(secondLayout, container, firstMountedComponents, nil).mountedComponents;
@@ -122,13 +118,11 @@
 
 - (void)test_WhenComponentBlocksImplicitAnimations_BoundsAnimationIsNotApplied
 {
-  auto const f = ^{
-    return [CKComponent newWithView:{
-      [CKBoundsAnimationRecordingView class],
-      {},
-      {},
-      true /* blockImplicitAnimations */
-    } size:{}];
+  auto const f = ^CKComponent *{
+    return CK::ComponentBuilder()
+               .viewClass([CKBoundsAnimationRecordingView class])
+               .blockImplicitAnimations(true)
+               .build();
   };
   auto const bcr1 = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, f);
   auto const l1 = [bcr1.component layoutThatFits:{{50, 50}, {50, 50}} parentSize:{}];
@@ -143,7 +137,7 @@
   XCTAssertFalse(barv.animatedLastBoundsChange);
 }
 
-- (void)testBoundsAnimationIsNotAppliedWhenViewRecycledForComponentWithDistinctScopeFrameToken
+- (void)testBoundsAnimationIsNotAppliedWhenViewRecycledForComponentWithDistinctUniqueIdentifier
 {
   UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 100, 100)];
 
@@ -165,19 +159,20 @@
   CKUnmountComponents(secondMountedComponents);
 }
 
-- (void)testBoundsAnimationIsNotAppliedToChildrenWhenViewRecycledForComponentWithDistinctScopeFrameToken
+- (void)testBoundsAnimationIsNotAppliedToChildrenWhenViewRecycledForComponentWithDistinctUniqueIdentifier
 {
   UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 100, 100)];
 
   const CKBuildComponentResult firstResult = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, ^{
     CKComponentScope scope([CKFlexboxComponent class], @"foo");
-    return [CKFlexboxComponent
-            newWithView:{[CKBoundsAnimationRecordingView class]}
-            size:{}
-            style:{.alignItems = CKFlexboxAlignItemsStretch}
-            children:{
-              {[CKComponent newWithView:{[CKBoundsAnimationRecordingView class]} size:{}], .flexGrow = 1},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .viewClass([CKBoundsAnimationRecordingView class])
+               .alignItems(CKFlexboxAlignItemsStretch)
+               .child(CK::ComponentBuilder()
+                   .viewClass([CKBoundsAnimationRecordingView class])
+                   .build())
+                   .flexGrow(1)
+               .build();
   });
   const CKComponentLayout firstLayout = [firstResult.component layoutThatFits:{{50, 50}, {50, 50}} parentSize:{}];
   NSSet *firstMountedComponents = CKMountComponentLayout(firstLayout, container, nil, nil).mountedComponents;
@@ -190,13 +185,14 @@
     // NB: We use a plain CKComponent, not a CKBoundsAnimationComponent; otherwise the scope tokens of the child will
     // be different, and we will avoid animating the child view for that reason instead of the changing parent scope.
     CKComponentScope scope([CKFlexboxComponent class], @"bar");
-    return [CKFlexboxComponent
-            newWithView:{[CKBoundsAnimationRecordingView class]}
-            size:{}
-            style:{.alignItems = CKFlexboxAlignItemsStretch}
-            children:{
-              {[CKComponent newWithView:{[CKBoundsAnimationRecordingView class]} size:{}], .flexGrow = 1},
-            }];
+    return CK::FlexboxComponentBuilder()
+               .viewClass([CKBoundsAnimationRecordingView class])
+               .alignItems(CKFlexboxAlignItemsStretch)
+               .child(CK::ComponentBuilder()
+                   .viewClass([CKBoundsAnimationRecordingView class])
+                   .build())
+                   .flexGrow(1)
+               .build();
   });
   const CKComponentLayout secondLayout = [secondResult.component layoutThatFits:{{100, 100}, {100, 100}} parentSize:{}];
   NSSet *secondMountedComponents = CKMountComponentLayout(secondLayout, container, firstMountedComponents, nil).mountedComponents;
@@ -204,8 +200,8 @@
 #if CK_ASSERTIONS_ENABLED
   CKBoundsAnimationRecordingView *v = (CKBoundsAnimationRecordingView *)secondResult.component.viewContext.view;
   CKBoundsAnimationRecordingView *subview = [[v subviews] firstObject];
-#endif
   CKAssertTrue(subview != nil && subview.animatedLastBoundsChange == NO);
+#endif
 
   CKUnmountComponents(secondMountedComponents);
 }
@@ -233,15 +229,36 @@
     .duration = 0.5,
     .delay = 0.2,
     .mode = CKComponentBoundsAnimationModeDefault,
-    .options = UIViewAnimationOptionPreferredFramesPerSecond60
+    .options = UIViewAnimationOptionPreferredFramesPerSecond60,
+    .timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.1 :0.9 :0.9 :0.1],
   };
   auto const ba2 = CKComponentBoundsAnimation {
     .duration = 0.5,
     .delay = 0.2,
-    .options = UIViewAnimationOptionPreferredFramesPerSecond60
+    .options = UIViewAnimationOptionPreferredFramesPerSecond60,
+    .timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.1 :0.9 :0.9 :0.1],
   };
 
   XCTAssert(ba1 == ba2);
+}
+
+- (void)test_WhenTimingFunctionsAreNotEqual_IsNotEqual
+{
+  auto const ba1 = CKComponentBoundsAnimation {
+    .duration = 0.5,
+    .delay = 0.2,
+    .mode = CKComponentBoundsAnimationModeDefault,
+    .options = UIViewAnimationOptionPreferredFramesPerSecond60,
+    .timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.1 :0.9 :0.9 :0.2],
+  };
+  auto const ba2 = CKComponentBoundsAnimation {
+    .duration = 0.5,
+    .delay = 0.2,
+    .options = UIViewAnimationOptionPreferredFramesPerSecond60,
+    .timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.1 :0.9 :0.9 :0.1],
+  };
+
+  XCTAssert(ba1 != ba2);
 }
 
 - (void)test_WhenSpringParamsAreNotEqual_IsNotEqual

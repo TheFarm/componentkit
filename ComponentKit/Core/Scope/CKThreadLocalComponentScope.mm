@@ -14,6 +14,8 @@
 #import <stack>
 
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKAnalyticsListener.h>
+#import <ComponentKit/CKRootTreeNode.h>
 
 #import "CKComponentScopeRoot.h"
 #import "CKScopeTreeNode.h"
@@ -35,15 +37,10 @@ CKThreadLocalComponentScope *CKThreadLocalComponentScope::currentScope() noexcep
 
 CKThreadLocalComponentScope::CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                                                          const CKComponentStateUpdateMap &updates,
-                                                         CKUnifyComponentTreeConfig unifyComponentTreeConfig,
-                                                         BuildTrigger trigger)
-: newScopeRoot([previousScopeRoot newRoot]), stateUpdates(updates), stack(), systraceListener(previousScopeRoot.analyticsListener.systraceListener), buildTrigger(trigger), componentAllocations(0), unifyComponentTreeConfig(unifyComponentTreeConfig), previousScope(CKThreadLocalComponentScope::currentScope())
+                                                         CKBuildTrigger trigger)
+: newScopeRoot([previousScopeRoot newRoot]), stateUpdates(updates), stack(), systraceListener(previousScopeRoot.analyticsListener.systraceListener), buildTrigger(trigger), componentAllocations(0), previousScope(CKThreadLocalComponentScope::currentScope())
 {
-  if (unifyComponentTreeConfig.enable) {
-    stack.push({newScopeRoot.rootNode.node(), previousScopeRoot.rootNode.node()});
-  } else {
-    stack.push({[newScopeRoot rootFrame], [previousScopeRoot rootFrame]});
-  }
+  stack.push({newScopeRoot.rootNode.node(), previousScopeRoot.rootNode.node()});
   keys.push({});
   pthread_setspecific(_threadKey(), this);
 }

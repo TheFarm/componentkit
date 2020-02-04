@@ -8,9 +8,15 @@
  *
  */
 
-#import <ComponentKit/CKScopeTreeNodeProtocol.h>
+#import <ComponentKit/CKDefines.h>
 
-#import "CKTreeNode.h"
+#if CK_NOT_SWIFT
+
+#import <ComponentKit/CKScopeTreeNodeProtocol.h>
+#import <ComponentKit/CKTreeNode.h>
+
+extern NSUInteger const kTreeNodeParentBaseKey;
+extern NSUInteger const kTreeNodeOwnerBaseKey;
 
 @protocol CKTreeNodeProtocol;
 
@@ -22,8 +28,9 @@
 @interface CKScopeTreeNode : CKTreeNode <CKScopeTreeNodeProtocol>
 {
   @package
-  std::unordered_map<CKScopeNodeKey, id<CKTreeNodeProtocol>> _children;
-  std::vector<std::tuple<CKScopeNodeKey, id<CKTreeNodeProtocol>>> _childrenVector;
+  std::vector<std::tuple<CKScopeNodeKey, id<CKTreeNodeProtocol>>> _children;
 }
 @end
+
+#endif
 

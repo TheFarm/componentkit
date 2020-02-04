@@ -8,6 +8,10 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <unordered_map>
 
 #import <UIKit/UIKit.h>
@@ -31,7 +35,7 @@ public:
   /// Get the states map.
   const Map &getMap() const { return map; }
 private:
-  const Map map;
+  Map map;
 };
 
 struct CKButtonComponentOptions {
@@ -85,3 +89,5 @@ struct CKButtonComponentOptions {
                       options:(const CKButtonComponentOptions &)options;
 
 @end
+
+#endif

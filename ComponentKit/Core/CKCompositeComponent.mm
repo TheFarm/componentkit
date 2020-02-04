@@ -13,20 +13,16 @@
 #import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKComponentDescriptionHelper.h>
 #import <ComponentKit/CKMacros.h>
+#import <ComponentKit/CKInternalHelpers.h>
 
-#import "CKInternalHelpers.h"
 #import "CKComponentInternal.h"
-#import "CKCompositeComponentInternal.h"
 #import "CKComponentSubclass.h"
 #import "CKRenderHelpers.h"
 
-@interface CKCompositeComponent ()
-{
-  CKComponent *_component;
-}
-@end
-
 @implementation CKCompositeComponent
+{
+  CKComponent *_child;
+}
 
 #if DEBUG
 + (void)initialize
@@ -57,7 +53,7 @@
 
   CKCompositeComponent *c = [super newWithView:view size:{}];
   if (c) {
-    c->_component = component;
+    c->_child = component;
   }
   return c;
 }
@@ -69,20 +65,7 @@
 
 - (NSString *)description
 {
-  return CKComponentDescriptionWithChildren([super description], [NSArray arrayWithObjects:_component, nil]);
-}
-
-- (CKComponent *)component
-{
-  return _component;
-}
-
-- (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
-            previousParent:(id<CKTreeNodeWithChildrenProtocol>)previousParent
-                    params:(const CKBuildComponentTreeParams &)params
-      parentHasStateUpdate:(BOOL)parentHasStateUpdate
-{
-  CKRender::buildComponentTreeWithPrecomputedChild(self, _component, parent, previousParent, params, parentHasStateUpdate);
+  return CKComponentDescriptionWithChildren([super description], [NSArray arrayWithObjects:_child, nil]);
 }
 
 - (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
@@ -91,16 +74,16 @@
 {
   CKAssert(size == CKComponentSize(),
            @"CKCompositeComponent only passes size {} to the super class initializer, but received size %@ "
-           "(component=%@)", size.description(), _component);
+           "(component=%@)", size.description(), _child);
 
-  CKComponentLayout l = [_component layoutThatFits:constrainedSize parentSize:parentSize];
-  return {self, l.size, {{{0,0}, l}}};
+  CKComponentLayout l = [_child layoutThatFits:constrainedSize parentSize:parentSize];
+  const auto lSize = l.size;
+  return {self, lSize, {{{0,0}, std::move(l)}}};
 }
 
-- (UIView *)viewForAnimation
+- (CKComponent *)child
 {
-  // Delegate to the wrapped component's viewForAnimation if we don't have one.
-  return [super viewForAnimation] ?: [_component viewForAnimation];
+  return _child;
 }
 
 @end

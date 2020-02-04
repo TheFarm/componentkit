@@ -13,71 +13,70 @@
 #import <ComponentKit/CKComponentScopeRoot.h>
 
 @implementation CKAnalyticsListenerSpy
-{
-  id<CKDebugAnalyticsListener> _debugAnalyticsListener;
-}
-
-+ (instancetype)newWithDebugAnalyticsListener:(id<CKDebugAnalyticsListener>)debugAnalyticsListener
-{
-  auto const a = [super new];
-  if (a) {
-    a->_debugAnalyticsListener = debugAnalyticsListener;
-  }
-  return a;
-}
 
 - (void)willBuildComponentTreeWithScopeRoot:(CKComponentScopeRoot *)scopeRoot
-                               buildTrigger:(BuildTrigger)buildTrigger
-                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates {}
+                               buildTrigger:(CKBuildTrigger)buildTrigger
+                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
+          enableComponentReuseOptimizations:(BOOL)enableComponentReuseOptimizations {}
 
 - (void)didBuildComponentTreeWithScopeRoot:(CKComponentScopeRoot *)scopeRoot
-                              buildTrigger:(BuildTrigger)buildTrigger
+                              buildTrigger:(CKBuildTrigger)buildTrigger
                               stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-                                 component:(CKComponent *)component {}
+                                 component:(CKComponent *)component
+        enableComponentReuseOptimizations:(BOOL)enableComponentReuseOptimizations {}
 
-- (void)willMountComponentTreeWithRootComponent:(CKComponent *)component
+- (void)willMountComponentTreeWithRootComponent:(id<CKMountable>)component
 {
   _willMountComponentHitCount++;
 }
 
-- (void)didMountComponentTreeWithRootComponent:(CKComponent *)component
-                         mountAnalyticsContext:(CK::Component::MountAnalyticsContext *)mountAnalyticsContext
+- (void)didMountComponentTreeWithRootComponent:(id<CKMountable>)component
+                         mountAnalyticsContext:(CK::Optional<CK::Component::MountAnalyticsContext>)mountAnalyticsContext
 {
   _didMountComponentHitCount++;
+  mountAnalyticsContext.apply([&](const auto &mc) {
+    _viewAllocationsCount += mc.viewAllocations;
+  });
 }
 
-- (void)willCollectAnimationsFromComponentTreeWithRootComponent:(CKComponent *)component
+- (void)willCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component
 {
   _willCollectAnimationsHitCount++;
 }
 
-- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(CKComponent *)component
+- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component
 {
   _didCollectAnimationsHitCount++;
 }
 
-- (void)willLayoutComponentTreeWithRootComponent:(CKComponent *)component buildTrigger:(CK::Optional<BuildTrigger>)buildTrigger
+- (void)willLayoutComponentTreeWithRootComponent:(id<CKMountable>)component buildTrigger:(CK::Optional<CKBuildTrigger>)buildTrigger
 {
   _willLayoutComponentTreeHitCount++;
 }
-- (void)didLayoutComponentTreeWithRootComponent:(CKComponent *)component { _didLayoutComponentTreeHitCount++; }
+- (void)didLayoutComponentTreeWithRootComponent:(id<CKMountable>)component { _didLayoutComponentTreeHitCount++; }
 
 - (void)willBuildComponent:(Class)componentClass {}
 - (void)didBuildComponent:(Class)componentClass {}
 
-- (void)willMountComponent:(CKComponent *)component {}
-- (void)didMountComponent:(CKComponent *)component {}
+- (void)willMountComponent:(id<CKMountable>)component {}
+- (void)didMountComponent:(id<CKMountable>)component {}
 
-- (void)willLayoutComponent:(CKComponent *)component {}
-- (void)didLayoutComponent:(CKComponent *)component {}
+- (void)willLayoutComponent:(id<CKMountable>)component {}
+- (void)didLayoutComponent:(id<CKMountable>)component {}
 
 - (void)willStartBlockTrace:(const char *const)blockName {}
-- (void)didStartBlockTrace:(const char *const)blockName {}
+- (void)didEndBlockTrace:(const char *const)blockName {}
 
 - (id<CKSystraceListener>)systraceListener { return nil; }
-- (id<CKDebugAnalyticsListener>)debugAnalyticsListener { return _debugAnalyticsListener; }
+- (BOOL)shouldCollectTreeNodeCreationInformation:(CKComponentScopeRoot *)scopeRoot { return NO; }
 
-- (BOOL)shouldCollectMountInformationForRootComponent:(CKComponent *)component { return NO; }
+- (void)didBuildTreeNodeForPrecomputedChild:(id<CKTreeNodeComponentProtocol>)component
+                                       node:(id<CKTreeNodeProtocol>)node
+                                     parent:(id<CKTreeNodeWithChildrenProtocol>)parent
+                                     params:(const CKBuildComponentTreeParams &)params
+                       parentHasStateUpdate:(BOOL)parentHasStateUpdate {}
+
+- (BOOL)shouldCollectMountInformationForRootComponent:(CKComponent *)component { return YES; }
 
 - (void)didReuseNode:(id<CKTreeNodeProtocol>)node inScopeRoot:(CKComponentScopeRoot *)scopeRoot fromPreviousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot {}
 

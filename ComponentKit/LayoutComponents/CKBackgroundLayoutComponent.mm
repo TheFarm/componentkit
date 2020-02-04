@@ -37,9 +37,14 @@
   return c;
 }
 
-- (std::vector<CKComponent *>)renderChildren:(id)state
+- (unsigned int)numberOfChildren
 {
-  return {_component, _background};
+  return CKIterable::numberOfChildren(_component, _background);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _component, _background);
 }
 
 /**

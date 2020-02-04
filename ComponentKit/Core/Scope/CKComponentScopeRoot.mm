@@ -10,14 +10,14 @@
 
 #import "CKComponentScopeRoot.h"
 
-#import <libkern/OSAtomic.h>
+#import <stdatomic.h>
 
-#import "CKTreeNodeWithChild.h"
+#import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKRootTreeNode.h>
+
 #import "CKComponentProtocol.h"
 #import "CKComponentControllerProtocol.h"
 #import "CKComponentScopeFrame.h"
-#import "CKInternalHelpers.h"
-#import "CKGlobalConfig.h"
 #import "CKThreadLocalComponentScope.h"
 
 typedef std::unordered_map<CKComponentPredicate, NSHashTable<id<CKComponentProtocol>> *> _CKRegisteredComponentsMap;
@@ -39,10 +39,10 @@ typedef std::unordered_map<CKComponentControllerPredicate, NSHashTable<id<CKComp
              componentPredicates:(const std::unordered_set<CKComponentPredicate> &)componentPredicates
    componentControllerPredicates:(const std::unordered_set<CKComponentControllerPredicate> &)componentControllerPredicates
 {
-  static int32_t nextGlobalIdentifier = 0;
+  static atomic_int nextGlobalIdentifier = 0;
   return [[CKComponentScopeRoot alloc] initWithListener:listener
                                       analyticsListener:analyticsListener
-                                       globalIdentifier:OSAtomicIncrement32(&nextGlobalIdentifier)
+                                       globalIdentifier:atomic_fetch_add_explicit(&nextGlobalIdentifier, 1, memory_order_relaxed)
                                     componentPredicates:componentPredicates
                           componentControllerPredicates:componentControllerPredicates];
 }
@@ -67,7 +67,6 @@ typedef std::unordered_map<CKComponentControllerPredicate, NSHashTable<id<CKComp
     _listener = listener;
     _analyticsListener = analyticsListener ?: globalConfig.defaultAnalyticsListener;
     _globalIdentifier = globalIdentifier;
-    _rootFrame = [[CKComponentScopeFrame alloc] initWithHandle:nil];
     _componentPredicates = componentPredicates;
     _componentControllerPredicates = componentControllerPredicates;
 #if DEBUG
@@ -171,7 +170,10 @@ typedef std::unordered_map<CKComponentControllerPredicate, NSHashTable<id<CKComp
 #if DEBUG
 - (NSString *)debugDescription
 {
-  return [[_rootFrame debugDescriptionComponents] componentsJoinedByString:@"\n"];
+  id node = _rootNode.node();
+  NSString *scopesTree = [[node debugDescriptionComponents] componentsJoinedByString:@"\n"];
+  NSString *nodesTree = [[node debugDescriptionNodes] componentsJoinedByString:@"\n"];
+  return [NSString stringWithFormat:@"Full Components Tree:\n%@\nScopes Components Tree:\n%@", nodesTree, scopesTree];
 }
 #endif
 

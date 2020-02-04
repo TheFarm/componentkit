@@ -38,9 +38,16 @@
   return c;
 }
 
-- (std::vector<CKComponent *>)renderChildren:(id)state
+#pragma mark - CKMountable
+
+- (unsigned int)numberOfChildren
 {
-  return {_overlay, _component};
+  return CKIterable::numberOfChildren(_component, _overlay);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _component, _overlay);
 }
 
 /**
@@ -54,18 +61,21 @@
            @"CKOverlayLayoutComponent only passes size {} to the super class initializer, but received size %@ "
            "(component=%@, overlay=%@)", size.description(), _component, _overlay);
 
-  const CKComponentLayout contentsLayout = [_component layoutThatFits:constrainedSize parentSize:parentSize];
+  // This variable needs to be mutable so we can move from it.
+  /* const */ CKComponentLayout contentsLayout = [_component layoutThatFits:constrainedSize parentSize:parentSize];
+
+  const auto contentsLayoutSize = contentsLayout.size;
 
   return {
     self,
-    contentsLayout.size,
+    contentsLayoutSize,
     _overlay
     ? std::vector<CKComponentLayoutChild> {
-      {{0,0}, contentsLayout},
-      {{0,0}, [_overlay layoutThatFits:{contentsLayout.size, contentsLayout.size} parentSize:contentsLayout.size]},
+      {{0,0}, std::move(contentsLayout)},
+      {{0,0}, [_overlay layoutThatFits:{contentsLayoutSize, contentsLayoutSize} parentSize:contentsLayoutSize]},
     }
     : std::vector<CKComponentLayoutChild> {
-      {{0,0}, contentsLayout},
+      {{0,0}, std::move(contentsLayout)},
     }
   };
 }

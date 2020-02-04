@@ -8,21 +8,22 @@
  *
  */
 
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
 #import <Foundation/Foundation.h>
 
 #import <unordered_set>
 
-#import <ComponentKit/CKAnalyticsListener.h>
 #import <ComponentKit/CKCollection.h>
 #import <ComponentKit/CKComponentBoundsAnimation.h>
 #import <ComponentKit/CKComponentScopeTypes.h>
 #import <ComponentKit/CKComponentScopeEnumeratorProvider.h>
 #import <ComponentKit/CKComponentControllerProtocol.h>
-#import <ComponentKit/CKStateUpdateMetadata.h>
-#import <ComponentKit/CKTreeNodeTypes.h>
-#import <ComponentKit/CKRootTreeNode.h>
 #import <ComponentKit/CKUpdateMode.h>
 
+@protocol CKAnalyticsListener;
 @protocol CKComponentProtocol;
 @protocol CKComponentControllerProtocol;
 @protocol CKTreeNodeProtocol;
@@ -32,13 +33,16 @@
 @class CKComponentScopeFrame;
 @class CKComponentScopeRoot;
 
+class CKRootTreeNode;
+struct CKStateUpdateMetadata;
+
 /** Component state announcements will always be made on the main thread. */
 @protocol CKComponentStateListener <NSObject>
 
 - (void)componentScopeHandle:(CKComponentScopeHandle *)handle
               rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
        didReceiveStateUpdate:(id (^)(id))stateUpdate
-                    metadata:(const CKStateUpdateMetadata)metadata
+                    metadata:(const CKStateUpdateMetadata &)metadata
                         mode:(CKUpdateMode)mode;
 
 @end
@@ -73,7 +77,6 @@
 @property (nonatomic, weak, readonly) id<CKComponentStateListener> listener;
 @property (nonatomic, strong, readonly) id<CKAnalyticsListener> analyticsListener;
 @property (nonatomic, readonly) CKComponentScopeRootIdentifier globalIdentifier;
-@property (nonatomic, strong, readonly) id<CKComponentScopeFrameProtocol> rootFrame;
 
 /** Render Support */
 @property (nonatomic, assign) BOOL hasRenderComponentInTree;
@@ -85,3 +88,5 @@
 #endif
 
 @end
+
+#endif
