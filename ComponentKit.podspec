@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '8.1'
   s.requires_arc = true
 
-  s.source_files = 'ComponentKit/**/*', 'ComponentTextKit/**/*'
+  s.source_files = 'ComponentKit/**/*', 'ComponentTextKit/**/*', 'RenderCore/**/*'
   s.exclude_files = ['ComponentKit/Info.plist']
   s.frameworks = 'UIKit', 'CoreText'
   s.library = 'c++'
