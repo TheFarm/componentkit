@@ -30,6 +30,9 @@
 // Indicates how many times `applyChange:` is called if change is verified.
 @property (nonatomic, readonly, assign) NSUInteger applyChangeCount;
 
+@property (nonatomic, copy) void(^willVerifyChange)(void);
+@property (nonatomic, copy) void(^didApplyChange)(void);
+
 - (void)sendNewState;
 - (void)sendNewStateWithSizeRange:(CKSizeRange)sizeRange;
 
@@ -38,10 +41,6 @@
 @interface CKDataSourceChangesetApplicatorTests : XCTestCase <CKAnalyticsListener>
 
 @end
-
-// Use without relying on lifecycle of `dataSource`.
-static NSUInteger _globalVerifyChangeCount = 0;
-static NSUInteger _globalApplyChangeCount = 0;
 
 @implementation CKDataSourceChangesetApplicatorTests
 {
@@ -77,8 +76,6 @@ static NSUInteger _globalApplyChangeCount = 0;
 {
   _dataSource = nil;
   _changesetApplicator = nil;
-  _globalVerifyChangeCount = 0;
-  _globalApplyChangeCount = 0;
 }
 
 - (void)testChangeIsAppliedAfterApplyChangesetIsCalled
@@ -94,6 +91,14 @@ static NSUInteger _globalApplyChangeCount = 0;
 
 - (void)testChangesetIsNotAppliedIfDataSourceIsDeallocated
 {
+  __block auto verifyChangeCount = 0;
+  __block auto applyChangeCount = 0;
+  _dataSource.willVerifyChange = ^{
+    verifyChangeCount++;
+  };
+  _dataSource.didApplyChange = ^{
+    applyChangeCount++;
+  };
   dispatch_sync(_queue, ^{
     [self->_changesetApplicator applyChangeset:defaultChangeset()
                                       userInfo:@{}
@@ -101,8 +106,8 @@ static NSUInteger _globalApplyChangeCount = 0;
   });
   _dataSource = nil;
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
-  XCTAssertEqual(_globalVerifyChangeCount, 0);
-  XCTAssertEqual(_globalApplyChangeCount, 0);
+  XCTAssertEqual(verifyChangeCount, 0);
+  XCTAssertEqual(applyChangeCount, 0);
 }
 
 - (void)testChangesAreAppliedSequentiallyAfterApplyChangesetIsCalledMultipleTimes
@@ -135,7 +140,6 @@ static NSUInteger _globalApplyChangeCount = 0;
   });
   [_dataSource sendNewState];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
-  [self assertNumberOfSuccessfulChanges:0 numberOfFailedChanges:2];
   [self waitUntilChangesetApplicatorQueueIsIdle];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
   [self assertNumberOfSuccessfulChanges:2 numberOfFailedChanges:2];
@@ -158,7 +162,6 @@ static NSUInteger _globalApplyChangeCount = 0;
   });
   [_dataSource sendNewState];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
-  [self assertNumberOfSuccessfulChanges:1 numberOfFailedChanges:1];
   [self waitUntilChangesetApplicatorQueueIsIdle];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
   [self assertNumberOfSuccessfulChanges:2 numberOfFailedChanges:1];
@@ -277,7 +280,6 @@ static NSUInteger _globalApplyChangeCount = 0;
   });
   [_dataSource sendNewState];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
-  [self assertNumberOfSuccessfulChanges:0 numberOfFailedChanges:1];
   [self waitUntilChangesetApplicatorQueueIsIdle];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
   [self assertNumberOfSuccessfulChanges:1 numberOfFailedChanges:1];
@@ -300,7 +302,6 @@ static NSUInteger _globalApplyChangeCount = 0;
   });
   [_dataSource sendNewState];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
-  [self assertNumberOfSuccessfulChanges:0 numberOfFailedChanges:2];
   [self waitUntilChangesetApplicatorQueueIsIdle];
   [self waitUntilChangesetApplicatorFinishesItsTasksOnMainQueue];
   [self assertNumberOfSuccessfulChanges:2 numberOfFailedChanges:2];
@@ -450,7 +451,9 @@ static CKDataSourceChangeset *defaultChangeset()
   const auto applied = [super applyChange:change];
   if (applied) {
     _applyChangeCount++;
-    _globalApplyChangeCount++;
+    if (_didApplyChange) {
+      _didApplyChange();
+    }
   }
   return applied;
 }
@@ -458,7 +461,9 @@ static CKDataSourceChangeset *defaultChangeset()
 - (BOOL)verifyChange:(CKDataSourceChange *)change
 {
   _verifyChangeCount++;
-  _globalVerifyChangeCount++;
+  if (_willVerifyChange) {
+    _willVerifyChange();
+  }
   return [super verifyChange:change];
 }
 

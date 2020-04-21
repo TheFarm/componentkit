@@ -64,7 +64,6 @@
 
   CKDataSourceViewport _viewport;
   BOOL _changesetSplittingEnabled;
-  id<CKDataSourceChangesetModificationGenerator> _changesetModificationGenerator;
 }
 @end
 
@@ -114,12 +113,6 @@
 {
   CKAssertMainThread();
   return _state;
-}
-
-- (void)setChangesetModificationGenerator:(id<CKDataSourceChangesetModificationGenerator>)changesetModificationGenerator
-{
-  CKAssertMainThread();
-  _changesetModificationGenerator = changesetModificationGenerator;
 }
 
 - (void)applyChangeset:(CKDataSourceChangeset *)changeset
@@ -390,10 +383,14 @@
     CKDataSourceItem *removedItem = [previousState objectAtIndexPath:removedIndex];
     CKComponentScopeRootAnnounceControllerInvalidation([removedItem scopeRoot]);
   }
+  [[appliedChanges removedSections] enumerateIndexesUsingBlock:^(NSUInteger idx, BOOL *) {
+    [previousState enumerateObjectsInSectionAtIndex:idx usingBlock:^(CKDataSourceItem *removedItem, NSIndexPath *, BOOL *) {
+      CKComponentScopeRootAnnounceControllerInvalidation([removedItem scopeRoot]);
+    }];
+  }];
 
   CKComponentUpdateComponentForComponentControllerWithIndexPaths(appliedChanges.finalUpdatedIndexPaths.allValues,
-                                                                 newState,
-                                                                 newState.configuration.options.updateComponentInControllerAfterBuild.valueOr(NO));
+                                                                 newState);
 
   [_announcer dataSource:self didModifyPreviousState:previousState withState:newState byApplyingChanges:appliedChanges];
 
@@ -505,11 +502,6 @@
                                                              userInfo:userInfo
                                                              viewport:_viewport
                                                                   qos:qos];
-  } else if(_changesetModificationGenerator) {
-    return [_changesetModificationGenerator changesetGenerationModificationForChangeset:changeset
-                                                                               userInfo:userInfo
-                                                                                    qos:qos
-                                                                          stateListener:self];
   } else {
     return
     [[CKDataSourceChangesetModification alloc] initWithChangeset:changeset

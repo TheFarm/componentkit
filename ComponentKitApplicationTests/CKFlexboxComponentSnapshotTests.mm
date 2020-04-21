@@ -921,13 +921,16 @@ static CKComponentViewConfiguration kLightGrayBackgroundView = {
    }
    children:{
      {
-       [CKRatioLayoutComponent
-        newWithRatio:1.5
-        size:{}
-        component:
-        [CKComponent
-         newWithView:{[UIView class], {{@selector(setBackgroundColor:), [UIColor blueColor]}}}
-         size:{.height = 150}]],
+       CK::RatioLayoutComponentBuilder()
+       .ratio(1.5)
+       .component(
+         CK::ComponentBuilder()
+         .viewClass([UIView class])
+         .backgroundColor([UIColor blueColor])
+         .height(150)
+         .build()
+       )
+       .build(),
        .flexBasis = CKRelativeDimension::Percent(1),
        .flexGrow = 1,
        .flexShrink = 1
@@ -3082,6 +3085,7 @@ static CKFlexboxComponentChild flexChild(CKComponent *c, CGFloat flexFactor)
   auto const c = CK::FlexboxComponentBuilder()
   .direction(CKFlexboxDirectionColumn)
   .useDeepYogaTrees(_useDeepYogaTrees)
+  .skipCompositeComponentSize(false)
   .child(CK::ComponentBuilder()
           .viewClass([UIView class])
           .backgroundColor([UIColor greenColor])

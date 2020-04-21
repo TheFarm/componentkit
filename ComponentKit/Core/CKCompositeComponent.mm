@@ -17,6 +17,7 @@
 
 #import "CKComponentInternal.h"
 #import "CKComponentSubclass.h"
+#import "CKIterableHelpers.h"
 #import "CKRenderHelpers.h"
 
 @implementation CKCompositeComponent
@@ -40,6 +41,24 @@
 }
 #endif
 
+- (instancetype _Nullable)initWithView:(const CKComponentViewConfiguration &)view
+                             component:(CKComponent  * _Nullable)component
+{
+  if (component == nil) {
+    return nil;
+  }
+
+  if (self = [super initWithView:view size:{}]) {
+    _child = component;
+  }
+  return self;
+}
+
+- (instancetype _Nullable)initWithComponent:(CKComponent * _Nullable)component
+{
+  return [self initWithView:{} component:component];
+}
+
 + (instancetype)newWithComponent:(CKComponent *)component
 {
   return [self newWithView:{} component:component];
@@ -47,14 +66,15 @@
 
 + (instancetype)newWithView:(const CKComponentViewConfiguration &)view component:(CKComponent *)component
 {
-  if (!component) {
+  if (component == nil) {
     return nil;
   }
 
   CKCompositeComponent *c = [super newWithView:view size:{}];
-  if (c) {
+  if (c != nil) {
     c->_child = component;
   }
+
   return c;
 }
 
@@ -84,6 +104,22 @@
 - (CKComponent *)child
 {
   return _child;
+}
+
+- (UIView *)viewForAnimation
+{
+  // Delegate to the wrapped component's viewForAnimation if we don't have one.
+  return [super viewForAnimation] ?: [_child viewForAnimation];
+}
+
+- (unsigned int)numberOfChildren
+{
+  return CKIterable::numberOfChildren(_child);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _child);
 }
 
 @end

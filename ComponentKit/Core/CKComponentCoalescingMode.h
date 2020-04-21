@@ -8,21 +8,14 @@
  *
  */
 
-#import <ComponentKit/CKDefines.h>
-
-#if CK_NOT_SWIFT
-
-#import <UIKit/UIKit.h>
-
-#import <ComponentKit/CKComponent.h>
+#import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-/** Infra components with single child should inherit from this one. Please DO NOT use it directly. */
-@interface CKSingleChildComponent : CKComponent
-- (CKComponent * _Nullable)child;
-@end
+typedef NS_ENUM(NSInteger, CKComponentCoalescingMode) {
+  CKComponentCoalescingModeNone = 0,
+  CKComponentCoalescingModeRender,
+  CKComponentCoalescingModeComposite,
+};
 
 NS_ASSUME_NONNULL_END
-
-#endif

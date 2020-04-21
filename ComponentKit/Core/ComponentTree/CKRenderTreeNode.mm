@@ -21,9 +21,9 @@
   if (self = [super initWithPreviousNode:previousNode scopeHandle:scopeHandle]) {
     auto const threadLocalScope = CKThreadLocalComponentScope::currentScope();
     if (threadLocalScope != nullptr) {
-      CKAssert(previousNode == nil || [previousNode conformsToProtocol:@protocol(CKScopeTreeNodeProtocol)], @"previousNode should conform to id<CKScopeTreeNodeProtocol>, but its class %@ does not.", previousNode.class);
+      CKAssert(previousNode == nil || [previousNode isKindOfClass:[CKScopeTreeNode class]], @"previousNode should be a CKScopeTreeNode, but its class is: %@.", previousNode.class);
       // Push the new pair into the thread local.
-      threadLocalScope->stack.push({.frame = self, .previousFrame = (id<CKScopeTreeNodeProtocol>)previousNode});
+      threadLocalScope->push({.node = self, .previousNode = (CKScopeTreeNode *)previousNode});
     }
   }
   return self;
@@ -36,23 +36,30 @@
     return;
   }
 
-  CKAssert(!threadLocalScope->stack.empty() && threadLocalScope->stack.top().frame == (id<CKComponentScopeFrameProtocol>)node, @"top.frame (%@) is not equal to node (%@)", threadLocalScope->stack.top().frame, node);
+  CKAssert(!threadLocalScope->stack.empty() && threadLocalScope->stack.top().node == (CKScopeTreeNode *)node, @"top.node (%@) is not equal to node (%@)", threadLocalScope->stack.top().node, node);
 
   // Pop the top element of the stack.
-  threadLocalScope->stack.pop();
+  threadLocalScope->pop();
 }
 
 - (void)didReuseRenderNode:(CKRenderTreeNode *)node
                  scopeRoot:(CKComponentScopeRoot *)scopeRoot
          previousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot
+       traverseAllChildren:(BOOL)traverseAllChildren
 {
   // Transfer the children vector from the reused node.
    _children = node->_children;
 
-  for (auto const &child : _children) {
-    auto childStateKey = std::get<0>(child);
-    if (std::get<1>(childStateKey.nodeKey) % 2 == kTreeNodeParentBaseKey) {
-      [std::get<1>(child) didReuseInScopeRoot:scopeRoot fromPreviousScopeRoot:previousScopeRoot];
+  if (traverseAllChildren) {
+    for (auto const &child : _children) {
+      [std::get<1>(child) didReuseWithParent:self inScopeRoot:scopeRoot traverseAllChildren:traverseAllChildren];
+    }
+  } else {
+    for (auto const &child : _children) {
+      auto childKey = std::get<0>(child);
+      if (std::get<1>(childKey) % 2 == kTreeNodeParentBaseKey) {
+        [std::get<1>(child) didReuseWithParent:self inScopeRoot:scopeRoot traverseAllChildren:traverseAllChildren];
+      }
     }
   }
 }

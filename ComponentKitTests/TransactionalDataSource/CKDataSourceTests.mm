@@ -233,9 +233,6 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
     // DataSource deallocation is also triggered on background.
     // CKLifecycleTestComponent will assert if it receives an invalidation not on the main thread,
     CKDataSource *dataSource = CKComponentTestDataSource(ComponentProvider, self);
-    CKRunRunLoopUntilBlockIsTrue(^BOOL{
-      return _state != nil;
-    });
     controller = ((CKLifecycleTestComponent *)[[_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]] rootLayout].component()).controller;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       [dataSource hash];
@@ -255,7 +252,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   [dataSource updateConfiguration:[_state.configuration copyWithContext:kTestInitialiseControllerContext sizeRange:{}]
                              mode:CKUpdateModeSynchronous
                          userInfo:@{}];
-  const auto secondController = (CKLifecycleTestComponentController *)((CKSingleChildComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
+  const auto secondController = (CKLifecycleTestComponentController *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
   XCTAssertNotEqual(firstController, secondController);
   XCTAssertTrue(firstController.calledInvalidateController);
   XCTAssertTrue(secondController.calledDidInit);
@@ -272,7 +269,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
                               build]
                         mode:CKUpdateModeSynchronous
                     userInfo:@{}];
-  const auto secondController = (CKLifecycleTestComponentController *)((CKSingleChildComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
+  const auto secondController = (CKLifecycleTestComponentController *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
   XCTAssertNotEqual(firstController, secondController);
   XCTAssertTrue(firstController.calledInvalidateController);
   XCTAssertTrue(secondController.calledDidInit);
@@ -281,13 +278,34 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 - (void)testDataSourceRemovingComponentTriggersInvalidateOnMainThread
 {
   CKDataSource *dataSource = CKComponentTestDataSource(ComponentProvider, self);
-  CKRunRunLoopUntilBlockIsTrue(^BOOL{
-    return _state != nil;
-  });
   const auto controller = ((CKLifecycleTestComponent *)[[_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]] rootLayout].component()).controller;
   [dataSource updateConfiguration:[_state.configuration copyWithContext:kTestInvalidateControllerContext sizeRange:{}]
                              mode:CKUpdateModeSynchronous
                          userInfo:@{}];
+  XCTAssertTrue(controller.calledInvalidateController);
+}
+
+- (void)testDataSourceRemovingItemTriggersInvalidateOnMainThread
+{
+  CKDataSource *dataSource = CKComponentTestDataSource(ComponentProvider, self);
+  const auto controller = ((CKLifecycleTestComponent *)[[_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]] rootLayout].component()).controller;
+  [dataSource applyChangeset:[[[CKDataSourceChangesetBuilder dataSourceChangeset]
+                               withRemovedItems:[NSSet setWithObject:[NSIndexPath indexPathForRow:0 inSection:0]]]
+                              build]
+                        mode:CKUpdateModeSynchronous
+                    userInfo:@{}];
+  XCTAssertTrue(controller.calledInvalidateController);
+}
+
+- (void)testDataSourceRemovingSectionTriggersInvalidateOnMainThread
+{
+  CKDataSource *dataSource = CKComponentTestDataSource(ComponentProvider, self);
+  const auto controller = ((CKLifecycleTestComponent *)[[_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]] rootLayout].component()).controller;
+  [dataSource applyChangeset:[[[CKDataSourceChangesetBuilder dataSourceChangeset]
+                               withRemovedSections:[NSIndexSet indexSetWithIndex:0]]
+                              build]
+                        mode:CKUpdateModeSynchronous
+                    userInfo:@{}];
   XCTAssertTrue(controller.calledInvalidateController);
 }
 
@@ -311,9 +329,6 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 - (void)testDataSourceApplyingPrecomputedChangeAfterStateIsChanged
 {
   const auto dataSource = CKComponentTestDataSource(ComponentProvider, self);
-  CKRunRunLoopUntilBlockIsTrue(^BOOL{
-    return _state != nil;
-  });
   const auto insertion =
   [[[CKDataSourceChangesetBuilder dataSourceChangeset]
     withInsertedItems:@{[NSIndexPath indexPathForItem:0 inSection:0]: @1}]
@@ -365,23 +380,13 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 
 - (void)testDataSourceComponentInControllerIsNotUpdatedAfterComponentBuild
 {
-  [self _testUpdateComponentInControllerAfterBuild:NO];
-}
-
-- (void)testDataSourceComponentInControllerIsUpdatedAfterComponentBuild
-{
-  [self _testUpdateComponentInControllerAfterBuild:YES];
-}
-
-- (void)_testUpdateComponentInControllerAfterBuild:(BOOL)updateComponentInControllerAfterBuild
-{
   CKComponentController *componentController = nil;
   // Autorelease pool is needed here to make sure `oldState` is deallocated so that weak reference of component
   // in `CKComponentController` is nil.
   @autoreleasepool {
     const auto dataSource = CKComponentTestDataSource(ComponentProvider,
                                                       self,
-                                                      {.updateComponentInControllerAfterBuild = updateComponentInControllerAfterBuild});
+                                                      {});
     CKComponent *component = (CKComponent *)[_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]].rootLayout.component();
     componentController = component.controller;
     const auto update =
@@ -390,14 +395,9 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
      build];
     [dataSource applyChangeset:update mode:CKUpdateModeSynchronous userInfo:@{}];
   }
-  if (updateComponentInControllerAfterBuild) {
-    // `latestComponent` is updated so `componentController.component` returns the latest generation of component even
-    // after `oldState` is deallocated.
-    XCTAssertNotEqual(componentController.component, nil);
-  } else {
-    // `latestComponent` is not updated so `componentController.component` is nil because `oldState` is deallocated.
-    XCTAssertEqual(componentController.component, nil);
-  }
+  // `latestComponent` is updated so `componentController.component` returns the latest generation of component even
+  // after `oldState` is deallocated.
+  XCTAssertNotEqual(componentController.component, nil);
 }
 
 /**

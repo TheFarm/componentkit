@@ -14,6 +14,7 @@
 #import <unordered_map>
 
 #import <RenderCore/CKAssert.h>
+#import <RenderCore/CKAssociatedObject.h>
 #import <RenderCore/CKGlobalConfig.h>
 #import <RenderCore/CKMutex.h>
 #import <RenderCore/ComponentViewReuseUtilities.h>
@@ -141,7 +142,7 @@ const char kComponentViewReusePoolMapAssociatedObjectKey = ' ';
 
 void ViewReusePool::hideAll(UIView *view, MountAnalyticsContext *mountAnalyticsContext)
 {
-  CKComponentViewReusePoolMapWrapper *wrapper = objc_getAssociatedObject(view, &kComponentViewReusePoolMapAssociatedObjectKey);
+  CKComponentViewReusePoolMapWrapper *wrapper = CKGetAssociatedObject_MainThreadAffined(view, &kComponentViewReusePoolMapAssociatedObjectKey);
   if (!wrapper) {
     return;
   }
@@ -151,39 +152,27 @@ void ViewReusePool::hideAll(UIView *view, MountAnalyticsContext *mountAnalyticsC
   };
   auto &viewReusePoolMap = wrapper->_viewReusePoolMap;
 
-  if (viewReusePoolMap.useCKDictionary) {
-    for (auto &it : viewReusePoolMap.dictionary) {
-      hide(it.second);
-    }
-  } else {
-    for (auto &it : viewReusePoolMap.map) {
-      hide(it.second);
-    }
+  for (auto &it : viewReusePoolMap.dictionary) {
+    hide(it.second);
   }
 }
 
-ViewReusePoolMap::ViewReusePoolMap() : useCKDictionary{CKReadGlobalConfig().useCKDictionaryInViewReusePoolMap} {}
+ViewReusePoolMap::ViewReusePoolMap() {}
 
 ViewReusePoolMap &ViewReusePoolMap::viewReusePoolMapForView(UIView *v)
 {
-  CKComponentViewReusePoolMapWrapper *wrapper = objc_getAssociatedObject(v, &kComponentViewReusePoolMapAssociatedObjectKey);
+  CKComponentViewReusePoolMapWrapper *wrapper = CKGetAssociatedObject_MainThreadAffined(v, &kComponentViewReusePoolMapAssociatedObjectKey);
   if (!wrapper) {
     wrapper = [[CKComponentViewReusePoolMapWrapper alloc] init];
-    objc_setAssociatedObject(v, &kComponentViewReusePoolMapAssociatedObjectKey, wrapper, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    CKSetAssociatedObject_MainThreadAffined(v, &kComponentViewReusePoolMapAssociatedObjectKey, wrapper);
   }
   return wrapper->_viewReusePoolMap;
 }
 
 void ViewReusePoolMap::reset(UIView *container, CK::Component::MountAnalyticsContext *mountAnalyticsContext)
 {
-  if (useCKDictionary) {
-    for (auto &it : dictionary) {
-      it.second.reset(mountAnalyticsContext);
-    }
-  } else {
-    for (auto &it : map) {
-      it.second.reset(mountAnalyticsContext);
-    }
+  for (auto &it : dictionary) {
+    it.second.reset(mountAnalyticsContext);
   }
 
   // Now we need to ensure that the ordering of container.subviews matches vendedViews.
@@ -231,12 +220,12 @@ static char kPersistentAttributesViewKey = ' ';
 
 static CKComponentAttributeSetWrapper *attributeSetWrapperForView(UIView *view)
 {
-  CKComponentAttributeSetWrapper *wrapper = objc_getAssociatedObject(view, &kPersistentAttributesViewKey);
+  CKComponentAttributeSetWrapper *wrapper = CKGetAssociatedObject_MainThreadAffined(view, &kPersistentAttributesViewKey);
   if (wrapper == nil) {
     wrapper = [[CKComponentAttributeSetWrapper alloc] init];
-    objc_setAssociatedObject(view, &kPersistentAttributesViewKey,
-                             wrapper,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    CKSetAssociatedObject_MainThreadAffined(view,
+                                            &kPersistentAttributesViewKey,
+                                            wrapper);
   }
   return wrapper;
 }

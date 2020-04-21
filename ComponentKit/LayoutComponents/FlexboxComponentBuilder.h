@@ -27,14 +27,20 @@ constexpr static auto __max = hasActiveChild;
 template <PropsBitmapType PropsBitmap = 0>
 class __attribute__((__may_alias__)) FlexboxComponentBuilder
     : public ComponentBuilderBase<FlexboxComponentBuilder, PropsBitmap> {
+  using Super = ComponentBuilderBase<FlexboxComponentBuilder, PropsBitmap>;
+
  public:
   FlexboxComponentBuilder() = default;
+  FlexboxComponentBuilder(const CK::ComponentSpecContext &context) : ComponentBuilderBase<FlexboxComponentBuilder, PropsBitmap>{context} { }
 
   ~FlexboxComponentBuilder() = default;
 
   /** Specifies the direction children are stacked in. */
   auto &direction(CKFlexboxDirection d)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.direction = d;
     return *this;
   }
@@ -42,6 +48,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   /** The amount of space between each child. Overriden by any margins on the child in the flex direction */
   auto &spacing(CGFloat s)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child(). To set spacing for a particular child, use 'spacing[Before|After]'.");
     _style.spacing = s;
     return *this;
   }
@@ -119,6 +128,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   /** How children are aligned if there are no flexible children. */
   auto &justifyContent(CKFlexboxJustifyContent j)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.justifyContent = j;
     return *this;
   }
@@ -126,6 +138,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   /** Orientation of children along cross axis */
   auto &alignItems(CKFlexboxAlignItems a)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.alignItems = a;
     return *this;
   }
@@ -133,6 +148,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   /** Alignment of container's lines in multi-line flex containers. Has no effect on single line containers. */
   auto &alignContent(CKFlexboxAlignContent a)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.alignContent = a;
     return *this;
   }
@@ -140,6 +158,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   /** Wrapping style of children in case there isn't enough space */
   auto &wrap(CKFlexboxWrap w)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.wrap = w;
     return *this;
   }
@@ -250,6 +271,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   */
   auto &border(const CKFlexboxBorder &b)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.border = b;
     return *this;
   }
@@ -261,6 +285,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
    */
   auto &borderTop(CGFloat b)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.border.top = b;
     return *this;
   }
@@ -272,6 +299,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
    */
   auto &borderBottom(CGFloat b)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.border.bottom = b;
     return *this;
   }
@@ -283,6 +313,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
    */
   auto &borderStart(CGFloat b)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.border.start = b;
     return *this;
   }
@@ -294,6 +327,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
    */
   auto &borderEnd(CGFloat b)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.border.end = b;
     return *this;
   }
@@ -304,6 +340,9 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
    */
   auto &layoutDirection(CKLayoutDirection d)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.layoutDirection = d;
     return *this;
   }
@@ -316,7 +355,25 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   */
   auto &useDeepYogaTrees(bool d)
   {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
     _style.useDeepYogaTrees = d;
+    return *this;
+  }
+
+  /**
+  If set to @c YES, flexbox will use the composite component child size to assign size
+  properties on yoga node instead of the size of composite component itself.
+
+  This is a temporary flag used for migration purposes.
+  */
+  auto &skipCompositeComponentSize(bool d)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(isNotSettingPropertiesForChild,
+                  "Properies for the container must be set before the first call to .child()");
+    _style.skipCompositeComponentSize = d;
     return *this;
   }
 
@@ -670,6 +727,136 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
   }
 
   /**
+  The width of the component relative to its parent's size.
+  */
+  auto &width(CKRelativeDimension w)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set width for a particular child, use 'sizeConstraints'."
+    );
+    return Super::width(w);
+  }
+
+  /**
+  The width of the component.
+  */
+  auto &width(CGFloat w)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set width for a particular child, use 'sizeConstraints'."
+    );
+    return Super::width(w);
+  }
+
+  /**
+  The height of the component relative to its parent's size.
+  */
+  auto &height(CKRelativeDimension h)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set height for a particular child, use 'sizeConstraints'."
+    );
+    return Super::height(h);
+  }
+
+  /**
+  The height of the component.
+  */
+  auto &height(CGFloat h)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set height for a particular child, use 'sizeConstraints'."
+    );
+    return Super::height(h);
+  }
+
+  /**
+  The minumum allowable width of the component relative to its parent's size.
+  */
+  auto &minWidth(CKRelativeDimension w)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set min width for a particular child, use 'sizeConstraints'."
+    );
+    return Super::minWidth(w);
+  }
+
+  /**
+  The minumum allowable height of the component relative to its parent's size.
+  */
+  auto &minHeight(CKRelativeDimension h)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set min height for a particular child, use 'sizeConstraints'."
+    );
+    return Super::minHeight(h);
+  }
+
+  /**
+  The maximum allowable width of the component relative to its parent's size.
+  */
+  auto &maxWidth(CKRelativeDimension w)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set max width for a particular child, use 'sizeConstraints'."
+    );
+    return Super::maxWidth(w);
+  }
+
+  /**
+  The maximum allowable height of the component relative to its parent's size.
+  */
+  auto &maxHeight(CKRelativeDimension h)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set max height for a particular child, use 'sizeConstraints'."
+    );
+    return Super::maxHeight(h);
+  }
+
+  /**
+  Specifies a size constraint that should apply to this component.
+  */
+  auto &size(CKComponentSize &&s)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set size for a particular child, use 'sizeConstraints'."
+    );
+    return Super::size(std::move(s));
+  }
+
+  /**
+  Specifies a size constraint that should apply to this component.
+  */
+  auto &size(const CKComponentSize &s)
+  {
+    constexpr auto isNotSettingPropertiesForChild = !PropBitmap::isSet(PropsBitmap, FlexboxComponentPropId::hasActiveChild);
+    static_assert(
+      isNotSettingPropertiesForChild,
+      "Properies for the container must be set before the first call to .child(). To set size for a particular child, use 'sizeConstraints'."
+    );
+    return Super::size(s);
+  }
+
+  /**
   Creates a new component instance with specified properties.
 
   @note  This method must @b not be called more than once on a given component builder instance.
@@ -724,7 +911,37 @@ class __attribute__((__may_alias__)) FlexboxComponentBuilder
 
 }
 
-using FlexboxComponentBuilder = BuilderDetails::FlexboxComponentBuilder<>;
+using FlexboxComponentBuilderEmpty = BuilderDetails::FlexboxComponentBuilder<>;
+using FlexboxComponentBuilderContext = BuilderDetails::FlexboxComponentBuilder<BuilderDetails::BuilderBasePropId::context>;
+
+/**
+ @uidocs https://fburl.com/CKFlexboxComponent:ca56
+
+ A layout component that creates a list of children vertically or horizontally according to Flexbox.
+
+ This component layout is powered by Yoga layout engine (https://github.com/facebook/yoga).
+ You can find more details about Yoga properties and implementation here (https://yogalayout.com/docs/)
+ Yoga playground (https://yogalayout.com/playground) allows you to experiment with different
+ layout configurations and can generate CKFlexboxComponent code for you
+ */
+auto FlexboxComponentBuilder() -> FlexboxComponentBuilderEmpty;
+
+/**
+ @uidocs https://fburl.com/CKFlexboxComponent:ca56
+
+ A layout component that creates a list of children vertically or horizontally according to Flexbox.
+
+ @param c The spec context to use.
+
+ @note This factory overload is to be used when a key is required to reference the built component in a spec from the
+ @c CK_ANIMATION function.
+
+ This component layout is powered by Yoga layout engine (https://github.com/facebook/yoga).
+ You can find more details about Yoga properties and implementation here (https://yogalayout.com/docs/)
+ Yoga playground (https://yogalayout.com/playground) allows you to experiment with different
+ layout configurations and can generate CKFlexboxComponent code for you
+ */
+auto FlexboxComponentBuilder(const CK::ComponentSpecContext &c) -> FlexboxComponentBuilderContext;
 }
 
 #endif

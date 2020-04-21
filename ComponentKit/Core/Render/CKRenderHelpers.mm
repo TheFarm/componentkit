@@ -18,6 +18,7 @@
 #import <ComponentKit/CKMutex.h>
 #import <ComponentKit/CKOptional.h>
 #import <ComponentKit/CKTreeNodeProtocol.h>
+#import <ComponentKit/CKCoalescedSpecSupport.h>
 
 #import "CKScopeTreeNode.h"
 #import "CKRenderTreeNode.h"
@@ -39,7 +40,8 @@ namespace CKRenderInternal {
     // Update the render node of the component reuse.
     [node didReuseRenderNode:previousNode
                    scopeRoot:params.scopeRoot
-           previousScopeRoot:params.previousScopeRoot];
+           previousScopeRoot:params.previousScopeRoot
+         traverseAllChildren:params.mergeTreeNodesLinks];
 
     if (childComponent != nullptr) {
       // Link the previous child component to the the new component.
@@ -86,12 +88,12 @@ namespace CKRenderInternal {
     // If there is no previous compononet, there is nothing to reuse.
     if (previousComponent) {
       // We check if the component node is dirty in the **previous** scope root.
-      auto const dirtyNodeIdsForPropsUpdates = params.previousScopeRoot.rootNode.dirtyNodeIdsForPropsUpdates();
+      auto const& dirtyNodeIdsForPropsUpdates = params.previousScopeRoot.rootNode.dirtyNodeIdsForPropsUpdates();
       auto const dirtyNodeId = dirtyNodeIdsForPropsUpdates.find(node.nodeIdentifier);
-      if (dirtyNodeId == params.treeNodeDirtyIds.end()) {
-        [params.systraceListener willCheckShouldComponentUpdate:component];
+      if (dirtyNodeId == dirtyNodeIdsForPropsUpdates.end()) {
+        [params.systraceListener willCheckShouldComponentUpdate:component.typeName];
         auto const shouldComponentUpdate = [component shouldComponentUpdate:previousComponent];
-        [params.systraceListener didCheckShouldComponentUpdate:component];
+        [params.systraceListener didCheckShouldComponentUpdate:component.typeName];
         if (!shouldComponentUpdate) {
           CKRenderInternal::reusePreviousComponent(component, childComponent, node, previousNode, params, didReuseBlock);
           return YES;
@@ -159,7 +161,7 @@ static auto didBuildComponentTree(id<CKTreeNodeProtocol> node,
     params.scopeRoot.rootNode.didBuildComponentTree(node);
 
     // Systrace logging
-    [params.systraceListener didBuildComponent:component.class];
+    [params.systraceListener didBuildComponent:component.typeName];
   }
 
 }
@@ -189,9 +191,13 @@ namespace CKRender {
       }
 
       // Update the `parentHasStateUpdate` param for Faster state/props updates.
-      if (!parentHasStateUpdate && CKRender::componentHasStateUpdate(component, previousParent, params)) {
-        parentHasStateUpdate = YES;
-      }
+      // TODO: Share this value with the value precomputed in the scope
+      parentHasStateUpdate = parentHasStateUpdate ||
+      (params.buildTrigger != CKBuildTrigger::NewTree &&
+       CKRender::componentHasStateUpdate(component.scopeHandle,
+                                         previousParent,
+                                         params.buildTrigger,
+                                         params.stateUpdates));
 
       // If there is a node, we update the parents' pointers to the next level in the tree.
       if (node) {
@@ -246,7 +252,7 @@ namespace CKRender {
         params.scopeRoot.rootNode.willBuildComponentTree(node);
 
         // Systrace logging
-        [params.systraceListener willBuildComponent:component.class];
+        [params.systraceListener willBuildComponent:component.typeName];
 
         // Faster state/props optimizations require previous parent.
         if (CKRenderInternal::reusePreviousComponentForSingleChild(node, component, childComponent, parent, previousParent, params, parentHasStateUpdate, didReuseBlock)) {
@@ -255,9 +261,14 @@ namespace CKRender {
         }
 
         // Update the `parentHasStateUpdate` param for Faster state/props updates.
-        if (!parentHasStateUpdate && CKRender::nodeHasStateUpdate(node, previousParent, params)) {
-          parentHasStateUpdate = YES;
-        }
+        parentHasStateUpdate = parentHasStateUpdate ||
+        (params.buildTrigger != CKBuildTrigger::NewTree &&
+         CKRender::componentHasStateUpdate(node.scopeHandle,
+                                           previousParent,
+                                           params.buildTrigger,
+                                           params.stateUpdates));
+
+        CK::CoalescedWillRenderRenderComponent(parentHasStateUpdate);
 
         auto const child = [component render:node.state];
         if (child) {
@@ -272,6 +283,7 @@ namespace CKRender {
                parentHasStateUpdate:parentHasStateUpdate];
         }
 
+        CK::CoalescedDidRenderRenderComponent();
         CKRenderInternal::didBuildComponentTree(node, component, params);
 
         return node;
@@ -296,7 +308,6 @@ namespace CKRender {
   namespace ScopeHandle {
     namespace Render {
       auto create(id<CKRenderComponentProtocol> component,
-                  Class componentClass,
                   id<CKTreeNodeProtocol> previousNode,
                   CKComponentScopeRoot *scopeRoot,
                   const CKComponentStateUpdateMap &stateUpdates) -> CKComponentScopeHandle*
@@ -309,15 +320,12 @@ namespace CKRender {
         } else {
           // The component needs a scope handle in few cases:
           // 1. Has an initial state
-          // 2. Has a controller
-          // 3. Returns `YES` from `requiresScopeHandle`
-          id initialState = [componentClass initialStateWithComponent:component];
-          if (initialState != CKTreeNodeEmptyState() ||
-              [componentClass controllerClass] ||
-              [componentClass requiresScopeHandle]) {
+          // 2. Returns `YES` from `requiresScopeHandle`
+          id initialState = [component initialState];
+          if (initialState != CKTreeNodeEmptyState() || component.requiresScopeHandle) {
             scopeHandle = [[CKComponentScopeHandle alloc] initWithListener:scopeRoot.listener
                                                             rootIdentifier:scopeRoot.globalIdentifier
-                                                            componentClass:componentClass
+                                                         componentTypeName:component.typeName
                                                               initialState:initialState];
           }
         }
@@ -334,28 +342,12 @@ namespace CKRender {
     }
   }
 
-  auto componentHasStateUpdate(__unsafe_unretained id<CKTreeNodeComponentProtocol> component,
-                               __unsafe_unretained id<CKTreeNodeWithChildrenProtocol> previousParent,
-                               const CKBuildComponentTreeParams &params) -> BOOL {
-    if (previousParent && params.buildTrigger == CKBuildTrigger::StateUpdate) {
-      auto const scopeHandle = component.scopeHandle;
-      if (scopeHandle != nil) {
-        auto const stateUpdateBlock = params.stateUpdates.find(scopeHandle);
-        return stateUpdateBlock != params.stateUpdates.end();
-      }
-    }
-    return NO;
-  }
-
-  auto nodeHasStateUpdate(__unsafe_unretained id<CKTreeNodeProtocol> node,
-                          __unsafe_unretained id<CKTreeNodeWithChildrenProtocol> previousParent,
-                          const CKBuildComponentTreeParams &params) -> BOOL {
-    if (previousParent && params.buildTrigger == CKBuildTrigger::StateUpdate) {
-      auto const scopeHandle = node.scopeHandle;
-      if (scopeHandle != nil) {
-        auto const stateUpdateBlock = params.stateUpdates.find(scopeHandle);
-        return stateUpdateBlock != params.stateUpdates.end();
-      }
+  auto componentHasStateUpdate(__unsafe_unretained CKComponentScopeHandle *scopeHandle,
+                               __unsafe_unretained id previousParent,
+                               CKBuildTrigger buildTrigger,
+                               const CKComponentStateUpdateMap& stateUpdates) -> BOOL {
+    if (scopeHandle != nil && previousParent != nil && buildTrigger == CKBuildTrigger::StateUpdate) {
+      return stateUpdates.find(scopeHandle) != stateUpdates.end();
     }
     return NO;
   }

@@ -47,9 +47,10 @@ class __attribute__((__may_alias__)) BuilderBase {
 
 protected:
   BuilderBase() = default;
-  BuilderBase(CK::ComponentSpecContext context) : _context(std::move(context)) { }
+  BuilderBase(const CK::ComponentSpecContext& context) : _context(context) { }
 
 public:
+  BuilderBase(const BuilderBase&) = default;
   /**
    Creates a new component instance and optionally wrap it with an animation component.
 
@@ -78,7 +79,9 @@ public:
     static_assert(contextIsSet, "Cannot set 'key' without specifying 'context'");
 
     _key = key;
-    return reinterpret_cast<Derived<PropsBitmap> &>(*this);
+
+    // `this` pointer needs adjustment since `BuilderBase` is not the first base class of `ComponentBuilderBase`
+    return reinterpret_cast<Derived<PropsBitmap | BuilderBasePropId::key> &>(*static_cast<Derived<PropsBitmap> *>(this));
   }
 
   /**
@@ -89,7 +92,9 @@ public:
   auto &animationInitial(CK::Animation::Initial animationInitial)
   {
     _transitions.onInitialMount = std::move(animationInitial);
-    return reinterpret_cast<Derived<PropsBitmap | BuilderBasePropId::transitions> &>(*this);
+
+    // `this` pointer needs adjustment since `BuilderBase` is not the first base class of `ComponentBuilderBase`
+    return reinterpret_cast<Derived<PropsBitmap | BuilderBasePropId::transitions> &>(*static_cast<Derived<PropsBitmap> *>(this));
   }
 
   /**
@@ -100,7 +105,9 @@ public:
   auto &animationFinal(CK::Animation::Final animationFinal)
   {
     _transitions.onFinalUnmount = std::move(animationFinal);
-    return reinterpret_cast<Derived<PropsBitmap | BuilderBasePropId::transitions> &>(*this);
+
+    // `this` pointer needs adjustment since `BuilderBase` is not the first base class of `ComponentBuilderBase`
+    return reinterpret_cast<Derived<PropsBitmap | BuilderBasePropId::transitions> &>(*static_cast<Derived<PropsBitmap> *>(this));
   }
 
 private:
@@ -208,7 +215,7 @@ public:
   /**
    Specifies whether subviews of a view for the component should be confined to its bounds.
 
-   @param enabled A Boolean value that determines whether subviews are confined
+   @param clip A Boolean value that determines whether subviews are confined
 
    @note Calling this method on a builder that does not have a view class set will trigger a compilation error.
 
@@ -335,6 +342,27 @@ public:
     constexpr auto viewClassIsSet = PropBitmap::isSet(PropsBitmap, ViewConfigBuilderPropId::viewClass);
     static_assert(viewClassIsSet, "Cannot set 'onTap' without setting 'viewClass' first");
     _attributes.insert(CKComponentTapGestureAttribute(a));
+    return reinterpret_cast<Derived<PropsBitmap> &>(*this);
+  }
+
+  /**
+   Used to determine how a view lays out its content when its bounds change. The default is @c UIViewContentModeScaleToFill .
+
+   @param m A mode to set.
+
+   @note Calling this method on a builder that does not have a view class set will trigger a compilation error.
+
+   @note Calling this method on a builder that already has a complete view configuration set will trigger
+   a compilation error.
+   */
+  auto &contentMode(UIViewContentMode m)
+  {
+    constexpr auto contentModeOverridesExistingViewConfiguration =
+        PropBitmap::isSet(PropsBitmap, ViewConfigBuilderPropId::viewConfig);
+    static_assert(!contentModeOverridesExistingViewConfiguration, "Setting 'contentMode' overrides existing view configuration");
+    constexpr auto viewClassIsSet = PropBitmap::isSet(PropsBitmap, ViewConfigBuilderPropId::viewClass);
+    static_assert(viewClassIsSet, "Cannot set 'contentMode' without setting 'viewClass' first");
+    _attributes.insert({@selector(setContentMode:), m});
     return reinterpret_cast<Derived<PropsBitmap> &>(*this);
   }
 
@@ -605,6 +633,10 @@ template <template <PropsBitmapType> class Derived, PropsBitmapType PropsBitmap>
 class __attribute__((__may_alias__)) ComponentBuilderBaseSizeOnly : public BuilderBase<Derived, PropsBitmap> {
 public:
   ComponentBuilderBaseSizeOnly() = default;
+
+  ComponentBuilderBaseSizeOnly(const CK::ComponentSpecContext& context)
+    : BuilderBase<Derived, PropsBitmap>{context} { }
+
   ~ComponentBuilderBaseSizeOnly() = default;
 
   /**
@@ -711,7 +743,7 @@ class __attribute__((__may_alias__)) ComponentBuilderBase : public ViewConfigBui
  protected:
   ComponentBuilderBase() = default;
 
-  ComponentBuilderBase(CK::ComponentSpecContext context)
+  ComponentBuilderBase(const CK::ComponentSpecContext& context)
     : BuilderBase<Derived, PropsBitmap>{context} { }
 
   ComponentBuilderBase(const ComponentBuilderBase &) = default;
@@ -860,7 +892,7 @@ auto ComponentBuilder() -> ComponentBuilderEmpty;
 /**
  Provides a fluent API for creating instances of @c CKComponent base class.
 
- @param context The spec context to use.
+ @param c The spec context to use.
 
  @note This factory overload is to be used when a key is required to reference the built component in a spec from the
  `CK_ANIMATION` function.
@@ -888,7 +920,7 @@ class __attribute__((__may_alias__)) ComponentBuilder : public ComponentBuilderB
 
 private:
   ComponentBuilder() = default;
-  ComponentBuilder(CK::ComponentSpecContext context)
+  ComponentBuilder(const CK::ComponentSpecContext& context)
     : ComponentBuilderBase<ComponentBuilder, PropsBitmap>{context} { }
 
   friend auto CK::ComponentBuilder() -> ComponentBuilderEmpty;

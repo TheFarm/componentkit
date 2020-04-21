@@ -21,18 +21,21 @@
 
 BOOL CKComponentBoundsAnimationPredicate(id<CKComponentProtocol> component)
 {
-  return CKSubclassOverridesInstanceMethod([CKComponent class], [component class], @selector(boundsAnimationFromPreviousComponent:));
+  if ([component.class isSubclassOfClass:[CKComponent class]]) {
+    return [(CKComponent *)component hasBoundsAnimations];
+  } else {
+    return NO;
+  }
 }
 
 /** Filter components that their controllers override the 'didPrepareLayout:ForComponent:' method. */
 BOOL CKComponentDidPrepareLayoutForComponentToControllerPredicate(id<CKComponentProtocol> component)
 {
-  const Class<CKComponentControllerProtocol> controllerClass = [[component class] controllerClass];
-  return
-  controllerClass
-  && CKSubclassOverridesInstanceMethod([CKComponentController class],
-                                 controllerClass,
-                                 @selector(didPrepareLayout:forComponent:));
+  if ([component.class isSubclassOfClass:[CKComponent class]]) {
+    return [(CKComponent *)component controllerOverridesDidPrepareLayout];
+  } else {
+    return NO;
+  }
 }
 
 auto CKComponentHasAnimationsOnInitialMountPredicate(id<CKMountable> const c) -> BOOL
@@ -42,7 +45,11 @@ auto CKComponentHasAnimationsOnInitialMountPredicate(id<CKMountable> const c) ->
 
 auto CKComponentHasAnimationsFromPreviousComponentPredicate(id<CKMountable> const c) -> BOOL
 {
-  return CKSubclassOverridesInstanceMethod([CKComponent class], [c class], @selector(animationsFromPreviousComponent:));
+  if ([c.class isSubclassOfClass:[CKComponent class]]) {
+    return [(CKComponent *)c hasAnimations];
+  } else {
+    return NO;
+  }
 }
 
 auto CKComponentHasAnimationsOnFinalUnmountPredicate(id<CKMountable> const c) -> BOOL
@@ -71,16 +78,13 @@ void CKComponentSendDidPrepareLayoutForComponentsWithIndexPaths(id<NSFastEnumera
 }
 
 void CKComponentUpdateComponentForComponentControllerWithIndexPaths(id<NSFastEnumeration> indexPaths,
-                                                                    CKDataSourceState *state,
-                                                                    BOOL shouldUpdateComponentOverride)
+                                                                    CKDataSourceState *state)
 {
   for (NSIndexPath *indexPath in indexPaths) {
     CKDataSourceItem *item = [state objectAtIndexPath:indexPath];
     item.rootLayout.enumerateCachedLayout(^(const CKComponentLayout &layout) {
       const auto component = (CKComponent *)layout.component;
-      if ([component.class shouldUpdateComponentInController] || shouldUpdateComponentOverride) {
-        component.controller.latestComponent = component;
-      }
+      component.controller.latestComponent = component;
     });
   }
 }

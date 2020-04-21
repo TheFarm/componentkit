@@ -10,13 +10,14 @@
 
 #import "CKRenderComponent.h"
 
-#import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKMutex.h>
 
-#import "CKBuildComponent.h"
 #import "CKComponentInternal.h"
+#import "CKComponentCreationValidation.h"
 #import "CKComponentSubclass.h"
+#import "CKThreadLocalComponentScope.h"
+#import "CKIterableHelpers.h"
 #import "CKRenderHelpers.h"
 #import "CKTreeNode.h"
 
@@ -41,21 +42,24 @@
 }
 #endif
 
-+ (instancetype)new
+- (void)didFinishComponentInitialization
 {
-  return [super newRenderComponentWithView:{} size:{}];
-}
-
-+ (instancetype)newWithView:(const CKComponentViewConfiguration &)view
-                       size:(const CKComponentSize &)size
-{
-  return [super newRenderComponentWithView:view size:size];
+  // Not calling super intentionally.
+  CKValidateRenderComponentCreation();
+  CKThreadLocalComponentScope::markCurrentScopeWithRenderComponentInTree();
+  CKComponentContextHelper::didCreateRenderComponent(self);
 }
 
 - (CKComponent *)render:(id)state
 {
   CKFailAssert(@"%@ MUST override the '%@' method.", [self class], NSStringFromSelector(_cmd));
   return nil;
+}
+
+- (UIView *)viewForAnimation
+{
+  // Delegate to the wrapped component's viewForAnimation if we don't have one.
+  return [super viewForAnimation] ?: [_child viewForAnimation];
 }
 
 - (void)buildComponentTree:(id<CKTreeNodeWithChildrenProtocol>)parent
@@ -91,11 +95,14 @@
   return _child;
 }
 
-#pragma mark - CKRenderComponentProtocol
-
-+ (id)initialStateWithComponent:(id<CKRenderComponentProtocol>)component
+- (unsigned int)numberOfChildren
 {
-  return [self initialState];
+  return CKIterable::numberOfChildren(_child);
+}
+
+- (id<CKMountable>)childAtIndex:(unsigned int)index
+{
+  return CKIterable::childAtIndex(self, index, _child);
 }
 
 + (id)initialState
@@ -103,7 +110,14 @@
   return CKTreeNodeEmptyState();
 }
 
-- (BOOL)shouldComponentUpdate:(id<CKRenderComponentProtocol>)component
+#pragma mark - CKRenderComponentProtocol
+
+- (id)initialState
+{
+  return [self.class initialState];
+}
+
+- (BOOL)shouldComponentUpdate:(id<CKReusableComponentProtocol>)component
 {
   return YES;
 }
@@ -120,9 +134,13 @@
   return nil;
 }
 
-+ (BOOL)requiresScopeHandle
+- (BOOL)requiresScopeHandle
 {
-  const Class componentClass = self;
+  if ([self.class controllerClass] != nil) {
+    return YES;
+  }
+
+  const Class componentClass = self.class;
 
   static CK::StaticMutex mutex = CK_MUTEX_INITIALIZER; // protects cache
   CK::StaticMutexLocker l(mutex);
@@ -130,16 +148,21 @@
   static std::unordered_map<Class, BOOL> *cache = new std::unordered_map<Class, BOOL>();
   const auto &it = cache->find(componentClass);
   if (it == cache->end()) {
-    BOOL hasAnimations = NO;
-    if (CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsFromPreviousComponent:)) ||
-        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnInitialMount)) ||
-        CKSubclassOverridesInstanceMethod([CKComponent class], componentClass, @selector(animationsOnFinalUnmount))) {
-      hasAnimations = YES;
-    }
-    cache->insert({componentClass, hasAnimations});
-    return hasAnimations;
+    const BOOL requiresScopeHandle =
+      CKSubclassOverridesInstanceMethod([CKRenderComponent class], componentClass, @selector(buildController)) ||
+      CKSubclassOverridesInstanceMethod([CKRenderComponent class], componentClass, @selector(animationsFromPreviousComponent:)) ||
+      CKSubclassOverridesInstanceMethod([CKRenderComponent class], componentClass, @selector(animationsOnInitialMount)) ||
+      CKSubclassOverridesInstanceMethod([CKRenderComponent class], componentClass, @selector(animationsOnFinalUnmount));
+    cache->insert({componentClass, requiresScopeHandle});
+    return requiresScopeHandle;
   }
   return it->second;
+}
+
+- (instancetype)clone
+{
+  // The default implementation returns `nil`, which indicates `clone` is not supported in this component.
+  return nil;
 }
 
 @end

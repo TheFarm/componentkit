@@ -11,6 +11,7 @@
 #import <UIKit/UIKit.h>
 
 #import <ComponentKit/BackgroundLayoutComponentBuilder.h>
+#import <ComponentKit/ButtonComponentBuilder.h>
 #import <ComponentKit/CenterLayoutComponentBuilder.h>
 #import <ComponentKit/CKAction.h>
 #import <ComponentKit/CKAnalyticsListener.h>
@@ -19,6 +20,7 @@
 #import <ComponentKit/CKAnimationComponent.h>
 #import <ComponentKit/CKArgumentPrecondition.h>
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKAssociatedObject.h>
 #import <ComponentKit/CKAsyncLayer.h>
 #import <ComponentKit/CKAutoSizedImageComponent.h>
 #import <ComponentKit/CKAvailability.h>
@@ -42,6 +44,7 @@
 #import <ComponentKit/CKComponentAnimation.h>
 #import <ComponentKit/CKComponentAnimationHooks.h>
 #import <ComponentKit/CKComponentBoundsAnimation.h>
+#import <ComponentKit/CKComponentCoalescingMode.h>
 #import <ComponentKit/CKComponentContext.h>
 #import <ComponentKit/CKComponentContext.h>
 #import <ComponentKit/CKComponentContextHelper.h>
@@ -68,14 +71,18 @@
 #import <ComponentKit/CKComponentRootView.h>
 #import <ComponentKit/CKComponentScope.h>
 #import <ComponentKit/CKComponentScopeEnumeratorProvider.h>
+#import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
 #import <ComponentKit/CKComponentScopeTypes.h>
 #import <ComponentKit/CKComponentSize.h>
+#import <ComponentKit/CKComponentSize_SwiftBridge.h>
 #import <ComponentKit/CKComponentSizeRangeProviding.h>
 #import <ComponentKit/CKComponentSpecContext.h>
 #import <ComponentKit/CKComponentViewAttribute.h>
+#import <ComponentKit/CKComponentViewAttribute_SwiftBridge.h>
 #import <ComponentKit/CKComponentViewClass.h>
 #import <ComponentKit/CKComponentViewConfiguration.h>
+#import <ComponentKit/CKComponentViewConfiguration_SwiftBridge.h>
 #import <ComponentKit/CKCompositeComponent.h>
 #import <ComponentKit/CKContainerWrapper.h>
 #import <ComponentKit/CKDataSource.h>
@@ -92,6 +99,7 @@
 #import <ComponentKit/CKDelayedNonNull.h>
 #import <ComponentKit/CKDictionary.h>
 #import <ComponentKit/CKDimension.h>
+#import <ComponentKit/CKDimension_SwiftBridge.h>
 #import <ComponentKit/CKDispatch.h>
 #import <ComponentKit/CKEqualityHelpers.h>
 #import <ComponentKit/CKFatal.h>
@@ -105,10 +113,10 @@
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKIterable.h>
 #import <ComponentKit/CKIterableHelpers.h>
+#import <ComponentKit/CKLinkable.h>
 #import <ComponentKit/CKLabelComponent.h>
 #import <ComponentKit/CKLayout.h>
 #import <ComponentKit/CKLayoutComponent.h>
-#import <ComponentKit/CKLinkable.h>
 #import <ComponentKit/CKMacros.h>
 #import <ComponentKit/CKMountable.h>
 #import <ComponentKit/CKMountableHelpers.h>
@@ -129,9 +137,8 @@
 #import <ComponentKit/CKRequired.h>
 #import <ComponentKit/CKRootTreeNode.h>
 #import <ComponentKit/CKScopeTreeNode.h>
-#import <ComponentKit/CKScopeTreeNodeProtocol.h>
-#import <ComponentKit/CKSingleChildComponent.h>
 #import <ComponentKit/CKSizeRange.h>
+#import <ComponentKit/CKSizeRange_SwiftBridge.h>
 #import <ComponentKit/CKStatefulViewComponent.h>
 #import <ComponentKit/CKStatefulViewComponentController.h>
 #import <ComponentKit/CKStatelessComponent.h>
@@ -162,3 +169,5 @@
 #import <ComponentKit/ImageComponentBuilder.h>
 #import <ComponentKit/InsetComponentBuilder.h>
 #import <ComponentKit/OverlayLayoutComponentBuilder.h>
+#import <ComponentKit/RatioLayoutComponentBuilder.h>
+#import <ComponentKit/AutoSizedImageComponentBuilder.h>

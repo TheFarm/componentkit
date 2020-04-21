@@ -12,6 +12,7 @@
 #import "CKComponentHostingViewInternal.h"
 
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKBlockSizeRangeProvider.h>
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKMacros.h>
 #import <ComponentKit/CKOptional.h>
@@ -68,17 +69,6 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
   CK_NOT_DESIGNATED_INITIALIZER();
 }
 
-- (instancetype)initWithComponentProvider:(Class<CKComponentProvider>)componentProvider
-                        sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
-{
-  return [self initWithComponentProvider:componentProvider
-                       sizeRangeProvider:sizeRangeProvider
-                     componentPredicates:{}
-           componentControllerPredicates:{}
-                       analyticsListener:nil
-                                 options:{}];
-}
-
 - (instancetype)initWithComponentProviderFunc:(CKComponentProviderFunc)componentProvider
                             sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
 {
@@ -90,23 +80,15 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
                                      options:{}];
 }
 
-- (instancetype)initWithComponentProvider:(Class<CKComponentProvider>)componentProvider
-                        sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
-                      componentPredicates:(const std::unordered_set<CKComponentPredicate> &)componentPredicates
-            componentControllerPredicates:(const std::unordered_set<CKComponentControllerPredicate> &)componentControllerPredicates
-                        analyticsListener:(id<CKAnalyticsListener>)analyticsListener
-                                  options:(const CKComponentHostingViewOptions &)options
+- (instancetype)initWithComponentProvider:(CKComponentProviderFunc)componentProvider
+                   sizeRangeProviderBlock:(CKComponentSizeRangeProviderBlock)sizeRangeProvider
 {
-  auto const p = ^(id<NSObject> m, id<NSObject> c) {
-    return [componentProvider componentForModel:m context:c];
-  };
-  return [self initWithComponentProviderBlock:p
-                  componentProviderIdentifier:[NSString stringWithFormat:@"%p", componentProvider]
-                            sizeRangeProvider:sizeRangeProvider
-                          componentPredicates:componentPredicates
-                componentControllerPredicates:componentControllerPredicates
-                            analyticsListener:analyticsListener
-                                      options:options];
+  return [self initWithComponentProviderFunc:componentProvider
+              sizeRangeProvider:[[CKBlockSizeRangeProvider alloc] initWithBlock:sizeRangeProvider]
+            componentPredicates:{}
+  componentControllerPredicates:{}
+              analyticsListener:nil
+                        options:{}];
 }
 
 - (instancetype)initWithComponentProviderFunc:(CKComponentProviderFunc)componentProvider
@@ -116,32 +98,12 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
                             analyticsListener:(id<CKAnalyticsListener>)analyticsListener
                                       options:(const CKComponentHostingViewOptions &)options
 {
-  componentProvider = componentProvider ?: nilProvider;
-
-  auto const p = ^(id<NSObject> m, id<NSObject> c) { return componentProvider(m, c); };
-  return [self initWithComponentProviderBlock:p
-                  componentProviderIdentifier:[NSString stringWithFormat:@"%p", componentProvider]
-                            sizeRangeProvider:sizeRangeProvider
-                          componentPredicates:componentPredicates
-                componentControllerPredicates:componentControllerPredicates
-                            analyticsListener:analyticsListener
-                                      options:options];
-}
-
-- (instancetype)initWithComponentProviderBlock:(CKComponentProviderBlock)componentProvider
-                   componentProviderIdentifier:(NSString *)componentProviderIdentifier
-                             sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
-                           componentPredicates:(const std::unordered_set<CKComponentPredicate> &)componentPredicates
-                 componentControllerPredicates:(const std::unordered_set<CKComponentControllerPredicate> &)componentControllerPredicates
-                             analyticsListener:(id<CKAnalyticsListener>)analyticsListener
-                                       options:(const CKComponentHostingViewOptions &)options
-{
   if (self = [super initWithFrame:CGRectZero]) {
     _componentGenerator =
     [[CKComponentGenerator alloc]
      initWithOptions:{
        .delegate = CK::makeNonNull(self),
-       .componentProvider = CK::makeNonNull(componentProvider),
+       .componentProvider = CK::makeNonNull(componentProvider ?: nilProvider),
        .componentPredicates = componentPredicates,
        .componentControllerPredicates = componentControllerPredicates,
        .analyticsListener = analyticsListener,
@@ -154,13 +116,7 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
      scopeIdentifier:_componentGenerator.scopeRoot.globalIdentifier
      analyticsListener:_componentGenerator.scopeRoot.analyticsListener
      sizeRangeProvider:sizeRangeProvider
-     allowTapPassthrough:_allowTapPassthrough
-     rootViewPoolOptions:options.rootViewPool.map([&](const auto rootViewPool) {
-      return CKComponentHostingViewRootViewPoolOptions {
-        .rootViewCategory = CK::makeNonNull([NSString stringWithFormat:@"%@-%@", NSStringFromClass(self.class), componentProviderIdentifier]),
-        .rootViewPool = rootViewPool,
-      };
-     })];
+     allowTapPassthrough:_allowTapPassthrough];
     [self addSubview:self.containerView];
 
     _initialSize = options.initialSize;
@@ -203,7 +159,11 @@ static auto nilProvider(id<NSObject>, id<NSObject>) -> CKComponent * { return ni
       return !CGSizeEqualToSize(rootLayout.size(), size);
     }).valueOr(NO);
     if (mountedComponent != _component || shouldLayoutComponent) {
-      auto const rootLayout = CKComputeRootComponentLayout(_component, {size, size}, _componentGenerator.scopeRoot.analyticsListener, buildTrigger);
+      auto const rootLayout = CKComputeRootComponentLayout(_component,
+                                                           {size, size},
+                                                           _componentGenerator.scopeRoot.analyticsListener,
+                                                           buildTrigger,
+                                                           _componentGenerator.scopeRoot);
       [self _applyRootLayout:rootLayout];
     }
     [_containerViewProvider mount];

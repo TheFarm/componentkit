@@ -27,6 +27,8 @@
 #import <ComponentKit/CKWeakObjectContainer.h>
 #import <ComponentKit/CKComponentDescriptionHelper.h>
 #import <ComponentKit/CKMountableHelpers.h>
+#import <ComponentKit/CKComponentSize_SwiftBridge+Internal.h>
+#import <ComponentKit/CKComponentViewConfiguration_SwiftBridge+Internal.h>
 
 #import "CKComponent+UIView.h"
 #import "CKComponentAccessibility.h"
@@ -49,18 +51,14 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
 
 @implementation CKComponent
 {
-  CKComponentScopeHandle<CKComponentController *> *_scopeHandle;
+  CKComponentScopeHandle *_scopeHandle;
   CKComponentViewConfiguration _viewConfiguration;
 
   /** Only non-null while mounted. */
   std::unique_ptr<CKMountInfo> _mountInfo;
 
-#if DEBUG
-  __weak id<CKTreeNodeProtocol> _treeNode;
-#endif
-
 #if CK_ASSERTIONS_ENABLED
-  BOOL leafComponentOnARenderTree;
+  __weak id<CKTreeNodeProtocol> _treeNode;
 #endif
 }
 
@@ -81,12 +79,6 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
   return [[self alloc] initWithView:view size:size];
 }
 
-+ (instancetype)newRenderComponentWithView:(const CKComponentViewConfiguration &)view
-                                      size:(const CKComponentSize &)size
-{
-  return [[self alloc] initRenderComponentWithView:view size:size];
-}
-
 + (instancetype)new
 {
   return [self newWithView:{} size:{}];
@@ -94,40 +86,60 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
 
 - (instancetype)init
 {
-  CK_NOT_DESIGNATED_INITIALIZER();
+  return [self initWithView:{} size:{}];
+}
+
+- (instancetype)initWithViewConfig:(CKComponentViewConfiguration_SwiftBridge *)viewConfig
+                     componentSize:(CKComponentSize_SwiftBridge *)size
+{
+  return [self initWithView:viewConfig.viewConfig size:size.componentSize];
 }
 
 - (instancetype)initWithView:(const CKComponentViewConfiguration &)view
                         size:(const CKComponentSize &)size
 {
   if (self = [super init]) {
-    CKValidateComponentCreation();
-    _scopeHandle = [CKComponentScopeHandle handleForComponent:self];
     _viewConfiguration = view;
     _size = size;
+
+    [self didFinishComponentInitialization];
   }
   return self;
 }
-
-- (instancetype)initRenderComponentWithView:(const CKComponentViewConfiguration &)view
-                                       size:(const CKComponentSize &)size
-{
-  if (self = [super init]) {
-    CKValidateRenderComponentCreation();
-    // Mark render component in the scope root.
-    CKThreadLocalComponentScope::markCurrentScopeWithRenderComponentInTree();
-    CKComponentContextHelper::didCreateRenderComponent(self);
-    _viewConfiguration = view;
-    _size = size;
-  }
-  return self;
-}
-
 
 - (void)dealloc
 {
   // Since the component and its view hold strong references to each other, this should never happen!
   CKAssert(_mountInfo == nullptr, @"%@ must be unmounted before dealloc", [self class]);
+}
+
+- (void)didFinishComponentInitialization
+{
+  CKValidateComponentCreation();
+  _scopeHandle = [CKComponentScopeHandle handleForComponent:self];
+}
+
+- (BOOL)hasAnimations
+{
+  return CKSubclassOverridesInstanceMethod([CKComponent class], [self class], @selector(animationsFromPreviousComponent:));
+}
+
+- (BOOL)hasBoundsAnimations
+{
+  return CKSubclassOverridesInstanceMethod([CKComponent class], [self class], @selector(boundsAnimationFromPreviousComponent:));
+}
+
+- (BOOL)controllerOverridesDidPrepareLayout
+{
+  const Class<CKComponentControllerProtocol> controllerClass = [[self class] controllerClass];
+  return CKSubclassOverridesInstanceMethod([CKComponentController class],
+                                  controllerClass,
+                                  @selector(didPrepareLayout:forComponent:));
+}
+
+- (id<CKComponentControllerProtocol>)buildController
+{
+  return [[(Class)[self.class controllerClass] alloc] initWithComponent:self];
 }
 
 - (void)acquireScopeHandle:(CKComponentScopeHandle *)scopeHandle
@@ -148,13 +160,18 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
   _viewConfiguration = viewConfiguration;
 }
 
+- (CKComponentScopeHandle *)scopeHandle
+{
+  return _scopeHandle;
+}
+
 - (CKComponentViewContext)viewContext
 {
   CKAssertMainThread();
   return _mountInfo ? _mountInfo->viewContext : CKComponentViewContext();
 }
 
-#if DEBUG
+#if CK_ASSERTIONS_ENABLED
 // These two methods are in DEBUG only in order to save memory.
 // Once we build the component tree (by calling `buildComponentTree:`) by default,
 // we can swap the the scopeHandle ref with the treeNode one.
@@ -176,9 +193,6 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
                     params:(const CKBuildComponentTreeParams &)params
       parentHasStateUpdate:(BOOL)parentHasStateUpdate
 {
-#if CK_ASSERTIONS_ENABLED
-  leafComponentOnARenderTree = YES;
-#endif
   CKRender::ComponentTree::Iterable::build(self, parent, previousParent, params, parentHasStateUpdate);
 }
 
@@ -269,7 +283,7 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
     UIView *view = _mountInfo->view;
     if (view) {
       CKAssert(CKMountedComponentForView(view) == self, @"");
-      [_scopeHandle.controller component:self willRelinquishView:view];
+      [(CKComponentController *)_scopeHandle.controller component:self willRelinquishView:view];
       CKSetMountedComponentForView(view, nil);
       _mountInfo->view = nil;
     }
@@ -278,7 +292,7 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
 
 - (void)childrenDidMount
 {
-  [_scopeHandle.controller componentDidMount:self];
+  [(CKComponentController *)_scopeHandle.controller componentDidMount:self];
 }
 
 #pragma mark - Animation
@@ -327,12 +341,13 @@ CGSize const kCKComponentParentSizeUndefined = {kCKComponentParentDimensionUndef
                                     relativeToParentSize:parentSize];
 
 #if CK_ASSERTIONS_ENABLED
-  // If `leafComponentOnARenderTree` is true, the infrastructure treats this component as a leaf component.
   // If this component has children in its layout, this means that it's not a real leaf component.
   // As a result, the infrastructure won't call `buildComponentTree:` on the component's children and can affect the render process.
-  if (leafComponentOnARenderTree && layout.children != nullptr) {
-    auto const childrenSize = layout.children->size();
-    CKAssertWithCategory(childrenSize == 0,
+  if (self.superclass == [CKComponent class] && layout.children != nullptr && layout.children->size() > 0) {
+    const auto overridesIterableMethods =
+    CKSubclassOverridesInstanceMethod([CKComponent class], self.class, @selector(childAtIndex:)) &&
+    CKSubclassOverridesInstanceMethod([CKComponent class], self.class, @selector(numberOfChildren));
+    CKAssertWithCategory(overridesIterableMethods,
                          NSStringFromClass([self class]),
                          @"%@ is subclassing CKComponent directly, you need to subclass CKLayoutComponent instead. "
                          "Context: we’re phasing out CKComponent subclasses for in favor of CKLayoutComponent subclasses. "
@@ -430,6 +445,10 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
 
 #pragma mark - CKComponentProtocol
 
++ (CKComponentCoalescingMode)coalescingMode {
+  return CKComponentCoalescingModeNone;
+}
+
 + (Class<CKComponentControllerProtocol>)controllerClass
 {
   const Class componentClass = self;
@@ -495,14 +514,14 @@ static void *kRootComponentMountedViewKey = &kRootComponentMountedViewKey;
   return _scopeHandle.state;
 }
 
-- (NSString *)debugName
+- (NSString *)className
 {
-  return NSStringFromClass(self.class);
+  return [NSString stringWithUTF8String:self.typeName];
 }
 
-+ (BOOL)shouldUpdateComponentInController
+- (const char *)typeName
 {
-  return NO;
+  return class_getName(self.class);
 }
 
 @end

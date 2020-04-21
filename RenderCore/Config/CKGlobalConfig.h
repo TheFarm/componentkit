@@ -24,22 +24,14 @@ struct CKGlobalConfig {
   /** Same as above, but only in DEBUG configuration */
   BOOL alwaysBuildRenderTreeInDebug = YES;
   /**
-   `componentController.component` will be updated right after commponent build if this is enabled.
-   This is only for running expeirment in ComponentKit. Please DO NOT USE.
+   Uses the composite component child size to assign size
+   properties on yoga node instead of the size of composite component itself
    */
-  BOOL updateComponentInControllerAfterBuild = NO;
+  BOOL skipCompositeComponentSize = YES;
   /**
-   `CK::Component::GlobalRootViewPool` will be used in `CKComponentHostingView` when this is enabled.
+   Avoid duplicate links in the tree nodes for owner/parent based nodes
    */
-  BOOL enableGlobalRootViewPoolInHostingView = NO;
-  /**
-   This enables acquiring lock when updating component in component controller.
-   */
-  BOOL shouldAcquireLockWhenUpdatingComponentInController = NO;
-  /**
-   Enables using \c CK::Dictionary instead of \c std::unordered_map in \c ViewReusePoolMap.
-   */
-  BOOL useCKDictionaryInViewReusePoolMap = NO;
+  BOOL mergeTreeNodesLinks = NO;
 };
 
 CKGlobalConfig CKReadGlobalConfig();

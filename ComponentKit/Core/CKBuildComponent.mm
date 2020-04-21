@@ -21,7 +21,6 @@
 #import "CKThreadLocalComponentScope.h"
 #import "CKTreeNodeProtocol.h"
 #import "CKComponentCreationValidation.h"
-#import "CKScopeTreeNodeProtocol.h"
 
 namespace CKBuildComponentHelpers {
   auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> CKBuildTrigger
@@ -74,18 +73,27 @@ namespace CKBuildComponentHelpers {
 
 CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
                                         const CKComponentStateUpdateMap &stateUpdates,
-                                        CKComponent *(^componentFactory)(void),
-                                        BOOL enableComponentReuseOptimizations)
+                                        NS_NOESCAPE CKComponent *(^componentFactory)(void),
+                                        BOOL enableComponentReuseOptimizations,
+                                        BOOL mergeTreeNodesLinks,
+                                        CKComponentCoalescingMode coalescingMode)
 {
   CKCAssertNotNil(componentFactory, @"Must have component factory to build a component");
   auto const globalConfig = CKReadGlobalConfig();
 
   auto const buildTrigger = CKBuildComponentHelpers::getBuildTrigger(previousRoot, stateUpdates);
+  auto const analyticsListener = [previousRoot analyticsListener];
+  auto const shouldCollectTreeNodeCreationInformation = [analyticsListener shouldCollectTreeNodeCreationInformation:previousRoot];
+
   CKThreadLocalComponentScope threadScope(previousRoot,
                                           stateUpdates,
-                                          buildTrigger);
+                                          buildTrigger,
+                                          mergeTreeNodesLinks,
+                                          enableComponentReuseOptimizations,
+                                          shouldCollectTreeNodeCreationInformation,
+                                          globalConfig.alwaysBuildRenderTree,
+                                          coalescingMode);
 
-  auto const analyticsListener = [previousRoot analyticsListener];
   [analyticsListener willBuildComponentTreeWithScopeRoot:previousRoot
                                             buildTrigger:buildTrigger
                                             stateUpdates:stateUpdates
@@ -101,11 +109,12 @@ CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
       .scopeRoot = threadScope.newScopeRoot,
       .previousScopeRoot = previousRoot,
       .stateUpdates = stateUpdates,
-      .treeNodeDirtyIds = CKRender::treeNodeDirtyIdsFor(previousRoot, stateUpdates, buildTrigger),
+      .treeNodeDirtyIds = threadScope.treeNodeDirtyIds,
       .buildTrigger = buildTrigger,
       .enableComponentReuseOptimizations = enableComponentReuseOptimizations,
       .systraceListener = threadScope.systraceListener,
-      .shouldCollectTreeNodeCreationInformation = [analyticsListener shouldCollectTreeNodeCreationInformation:previousRoot],
+      .shouldCollectTreeNodeCreationInformation = shouldCollectTreeNodeCreationInformation,
+      .mergeTreeNodesLinks = mergeTreeNodesLinks,
     };
 
     // Build the component tree from the render function.

@@ -56,9 +56,9 @@ struct CKComponentGeneratorOptions {
   CK::NonNull<id<CKComponentGeneratorDelegate>> delegate;
 
   /**
-   A `componentProvider` block that is called when generate component.
+   A `componentProvider` function that is called when generate component.
    */
-  CK::NonNull<CKComponentProviderBlock> componentProvider;
+  CK::NonNull<CKComponentProviderFunc> componentProvider;
 
   /**
    Optional `componentPredicates` that is used for creating `CKComponentScopeRoot`.
@@ -81,6 +81,9 @@ struct CKComponentGeneratorOptions {
    A queue that is used to perform all majors tasks in `CKComponentGenerator`.
    All public APIs of `CKComponentGenerator` must be called on this queue.
    Defaults to main queue.
+
+   NOTE: setting this to `nil` makes `CKComponentGenerator` thread-safe but it acquires
+   locks when calling methods, which should be avoided unless it's extremely necessary.
    */
   dispatch_queue_t affinedQueue = dispatch_get_main_queue();
 };

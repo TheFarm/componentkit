@@ -19,10 +19,11 @@
 
 #import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKBuildComponent.h>
-#import <ComponentKit/CKComponentScopeFrame.h>
 #import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKTreeNodeProtocol.h>
+#import <ComponentKit/CKScopeTreeNode.h>
+#import <ComponentKit/CKComponentCoalescingMode.h>
 
 @protocol CKSystraceListener;
 
@@ -30,7 +31,12 @@ class CKThreadLocalComponentScope {
 public:
   CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                               const CKComponentStateUpdateMap &updates,
-                              CKBuildTrigger trigger = CKBuildTrigger::NewTree);
+                              CKBuildTrigger trigger = CKBuildTrigger::NewTree,
+                              BOOL merge = NO,
+                              BOOL enableComponentReuseOptimizations = YES,
+                              BOOL shouldCollectTreeNodeCreationInformation = NO,
+                              BOOL alwaysBuildRenderTree = NO,
+                              CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone);
   ~CKThreadLocalComponentScope();
 
   /** Returns nullptr if there isn't a current scope */
@@ -43,9 +49,11 @@ public:
   static void markCurrentScopeWithRenderComponentInTree();
 
   CKComponentScopeRoot *const newScopeRoot;
+  CKComponentScopeRoot *const previousScopeRoot;
   const CKComponentStateUpdateMap stateUpdates;
-  std::stack<CKComponentScopeFramePair> stack;
+  std::stack<CKComponentScopePair> stack;
   std::stack<std::vector<id<NSObject>>> keys;
+  std::stack<BOOL> ancestorHasStateUpdate;
 
   /** The current systrace listener. Can be nil if systrace is not enabled. */
   id<CKSystraceListener> systraceListener;
@@ -55,6 +63,21 @@ public:
 
   /** Component Allocations */
   NSUInteger componentAllocations;
+
+  /** Avoid duplicate links in the tree nodes for owner/parent based nodes */
+  BOOL mergeTreeNodesLinks;
+
+  const CKTreeNodeDirtyIds treeNodeDirtyIds;
+
+  const BOOL enableComponentReuseOptimizations;
+
+  const BOOL shouldCollectTreeNodeCreationInformation;
+
+  const CKComponentCoalescingMode coalescingMode;
+
+  void push(CKComponentScopePair scopePair, BOOL keysSupportEnabled = NO);
+  void push(CKComponentScopePair scopePair, BOOL keysSupportEnabled, BOOL ancestorHasStateUpdate);
+  void pop(BOOL keysSupportEnabled = NO, BOOL ancestorStateUpdateSupportEnabled = NO);
 
 private:
   CKThreadLocalComponentScope *const previousScope;

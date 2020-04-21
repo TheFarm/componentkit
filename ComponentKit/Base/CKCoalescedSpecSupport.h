@@ -8,4 +8,17 @@
  *
  */
 
-#import <RenderCore/CKLinkable.h>
+#import <ComponentKit/CKDefines.h>
+
+#if CK_NOT_SWIFT
+
+#import <Foundation/Foundation.h>
+
+namespace CK {
+
+inline void CoalescedWillRenderRenderComponent(bool ancestorHasStateUpdate) {}
+inline void CoalescedDidRenderRenderComponent() {}
+inline BOOL IsCoalescedMode() { return NO; }
+}
+
+#endif

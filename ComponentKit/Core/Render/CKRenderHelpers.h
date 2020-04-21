@@ -67,13 +67,13 @@ namespace CKRender {
                  CKRenderDidReuseComponentBlock didReuseBlock = nil) -> id<CKTreeNodeProtocol>;
     }
 
-    /**
-     Builds the component tree from a root component.
-
-     @param component The root component of the tree.
-     @param params Collection of parameters to use to properly setup build component tree step.
-     */
     namespace Root {
+      /**
+      Builds the component tree from a root component.
+
+      @param component The root component of the tree.
+      @param params Collection of parameters to use to properly setup build component tree step.
+      */
       auto build(id<CKTreeNodeComponentProtocol> component, const CKBuildComponentTreeParams &params) -> void;
     }
   }
@@ -84,12 +84,10 @@ namespace CKRender {
        Create a scope handle for Render component (if needed).
 
        @param component Render component which the scope handle will be created for.
-       @param componentClass The component class .
        @param previousNode The prevoious equivalent tree node.
        @param stateUpdates The state updates map of this component generation.
        */
       auto create(id<CKRenderComponentProtocol> component,
-                  Class componentClass,
                   id<CKTreeNodeProtocol> previousNode,
                   CKComponentScopeRoot *scopeRoot,
                   const CKComponentStateUpdateMap &stateUpdates) -> CKComponentScopeHandle*;
@@ -99,10 +97,10 @@ namespace CKRender {
   /**
    @return `YES` if the component of the node has a state update, `NO` otherwise.
    */
-  auto componentHasStateUpdate(__unsafe_unretained id<CKTreeNodeComponentProtocol> component,
-                               __unsafe_unretained id<CKTreeNodeWithChildrenProtocol> previousParent,
-                               const CKBuildComponentTreeParams &params) -> BOOL;
-
+  auto componentHasStateUpdate(__unsafe_unretained CKComponentScopeHandle *scopeHandle,
+                               __unsafe_unretained id previousParent,
+                               CKBuildTrigger buildTrigger,
+                               const CKComponentStateUpdateMap& stateUpdates) -> BOOL;
   /**
    @return `YES` if the component of the node has a state update, `NO` otherwise.
    */

@@ -9,12 +9,7 @@
  */
 
 #import <ComponentKit/CKDefines.h>
-
-#if CK_NOT_SWIFT
-
-
 #import <ComponentKit/CKComponent.h>
-#import <ComponentKit/CKSingleChildComponent.h>
 #import <ComponentKit/CKRenderComponentProtocol.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -23,7 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 @warning Overriding -layoutThatFits:parentSize: or -computeLayoutThatFits: is **not allowed** for any subclass.
 */
 
-@interface CKRenderComponent : CKSingleChildComponent <CKRenderWithChildComponentProtocol>
+@interface CKRenderComponent : CKComponent <CKRenderWithChildComponentProtocol>
 
 /**
  Returns a child component that needs to be rendered from this component.
@@ -31,6 +26,8 @@ NS_ASSUME_NONNULL_BEGIN
  @param state The current state of the component.
  */
 - (CKComponent * _Nullable)render:(id _Nullable)state;
+
+#if CK_NOT_SWIFT
 
 /**
  Returns view configuration for the component.
@@ -42,8 +39,16 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (CKComponentViewConfiguration)viewConfigurationWithState:(id)state;
 
+#endif
+
 @end
 
-NS_ASSUME_NONNULL_END
-
+#if CK_SWIFT
+#define CK_RENDER_COMPONENT_INIT_UNAVAILABLE \
+  - (instancetype)init NS_UNAVAILABLE;
+#else
+#define CK_RENDER_COMPONENT_INIT_UNAVAILABLE \
+  + (instancetype)new NS_UNAVAILABLE;
 #endif
+
+NS_ASSUME_NONNULL_END

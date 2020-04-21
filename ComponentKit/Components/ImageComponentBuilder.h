@@ -78,7 +78,7 @@ public:
   /**
    Specifies whether subviews of a view for the component should be confined to its bounds.
 
-   @param enabled A Boolean value that determines whether subviews are confined
+   @param clip A Boolean value that determines whether subviews are confined
 
    @note Calling this method on a builder that does not have a view class set will trigger a compilation error.
 
@@ -172,6 +172,17 @@ public:
   {
     _attributes.insert(CKComponentTapGestureAttribute(a));
     return reinterpret_cast<ImageComponentBuilder<PropsBitmap | ImageComponentPropId::anyAttribute> &>(*this);
+  }
+
+  /**
+   Used to determine how a view lays out its content when its bounds change. The default is @c UIViewContentModeScaleToFill .
+
+   @param m A mode to set.
+   */
+  auto &contentMode(UIViewContentMode m)
+  {
+    _attributes.insert({@selector(setContentMode:), m});
+    return *this;
   }
 
   /**

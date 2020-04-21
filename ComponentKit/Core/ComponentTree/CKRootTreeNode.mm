@@ -10,19 +10,54 @@
 
 #import "CKRootTreeNode.h"
 
+#import <ComponentKit/CKAssert.h>
+
 #import "CKRenderHelpers.h"
 #import "CKScopeTreeNode.h"
 
 CKRootTreeNode::CKRootTreeNode(): _node([CKScopeTreeNode new]) {};
 
+#if CK_ASSERTIONS_ENABLED
+static auto _parentIdentifiers(const std::unordered_map<CKTreeNodeIdentifier,
+                               id<CKTreeNodeProtocol>>& nodesToParentNodes,
+                               id<CKTreeNodeProtocol> node) -> NSString * {
+  const auto parents = [NSMutableArray new];
+
+  while (node.component != nil) {
+    [parents addObject:node.component.className];
+    const auto it = nodesToParentNodes.find(node.nodeIdentifier);
+    node = (it != nodesToParentNodes.cend()) ? it->second : nil;
+  }
+
+  return [[[parents reverseObjectEnumerator] allObjects] componentsJoinedByString:@"-"];
+}
+
+static auto _existingAndNewParentIdentifiers(
+    const std::unordered_map<CKTreeNodeIdentifier,
+    id<CKTreeNodeProtocol>>& nodesToParentNodes,
+    id<CKTreeNodeProtocol> node,
+    id<CKTreeNodeProtocol> parent) -> NSString * {
+  return [NSString stringWithFormat:@"Previous Parents:%@\nNew Parents:%@",
+          _parentIdentifiers(nodesToParentNodes, nodesToParentNodes.find(node.nodeIdentifier)->second),
+          _parentIdentifiers(nodesToParentNodes, parent)];
+}
+
+#endif
+
 void CKRootTreeNode::registerNode(id<CKTreeNodeProtocol> node, id<CKTreeNodeProtocol> parent) {
   CKCAssert(parent != nil, @"Cannot register a nil parent node");
   if (node) {
+#if CK_ASSERTIONS_ENABLED
+    CKCAssertWithCategory(_nodesToParentNodes.find(node.nodeIdentifier) == _nodesToParentNodes.cend(),
+      node.component.className,
+      @"Attempting to register a component and its parent twice.\n%@",
+      _existingAndNewParentIdentifiers(_nodesToParentNodes, node, parent));
+#endif
     _nodesToParentNodes[node.nodeIdentifier] = parent;
   }
 }
 
-id<CKTreeNodeProtocol> CKRootTreeNode::parentForNodeIdentifier(CKTreeNodeIdentifier nodeIdentifier) {
+id<CKTreeNodeProtocol> CKRootTreeNode::parentForNodeIdentifier(CKTreeNodeIdentifier nodeIdentifier) const {
   CKCAssert(nodeIdentifier != 0, @"Cannot retrieve parent for an empty node");
   auto const it = _nodesToParentNodes.find(nodeIdentifier);
   if (it != _nodesToParentNodes.end()) {
@@ -31,11 +66,11 @@ id<CKTreeNodeProtocol> CKRootTreeNode::parentForNodeIdentifier(CKTreeNodeIdentif
   return nil;
 }
 
-bool CKRootTreeNode::isEmpty() {
+bool CKRootTreeNode::isEmpty() const {
   return _node.childrenSize == 0;
 }
 
-id<CKScopeTreeNodeProtocol> CKRootTreeNode::node() {
+CKScopeTreeNode *CKRootTreeNode::node() const {
   return _node;
 }
 

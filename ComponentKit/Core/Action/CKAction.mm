@@ -16,6 +16,7 @@
 
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKAssert.h>
+#import <ComponentKit/CKAssociatedObject.h>
 #import <ComponentKit/CKMutex.h>
 
 #import "CKComponent+UIView.h"
@@ -234,10 +235,10 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
     {
       std::string("CKComponentActionAttribute-") + action.identifier() + "-" + std::to_string(controlEvents),
       ^(UIControl *control, id value){
-        CKComponentActionList *list = objc_getAssociatedObject(control, ck_actionListKey);
+        CKComponentActionList *list = CKGetAssociatedObject_MainThreadAffined(control, ck_actionListKey);
         if (list == nil) {
           list = [CKComponentActionList new];
-          objc_setAssociatedObject(control, ck_actionListKey, list, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+          CKSetAssociatedObject_MainThreadAffined(control, ck_actionListKey, list);
         }
         if (list->_registeredForwarders.insert(controlEvents).second) {
           // Since this is the first time we've seen this {control, events} pair, add a Forwarder as a target.
@@ -253,7 +254,7 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
         list->_actions[controlEvents].push_back(action);
       },
       ^(UIControl *control, id value){
-        CKComponentActionList *const list = objc_getAssociatedObject(control, ck_actionListKey);
+        CKComponentActionList *const list = CKGetAssociatedObject_MainThreadAffined(control, ck_actionListKey);
         CKCAssertNotNil(list, @"Unapplicator should always find an action list installed by applicator");
         auto &actionList = list->_actions[controlEvents];
         actionList.erase(std::find(actionList.begin(), actionList.end(), action));
@@ -280,7 +281,7 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
 
 - (void)handleControlEventFromSender:(UIControl *)sender withEvent:(UIEvent *)event
 {
-  CKComponentActionList *const list = objc_getAssociatedObject(sender, ck_actionListKey);
+  CKComponentActionList *const list = CKGetAssociatedObject_MainThreadAffined(sender, ck_actionListKey);
   CKCAssertNotNil(list, @"Forwarder should always find an action list installed by applicator");
   // Protect against mutation-during-enumeration by copying the list of actions to send:
   const std::vector<CKAction<UIEvent *>> copiedActions = list->_actions[_controlEvents];
@@ -298,7 +299,7 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
 std::unordered_map<UIControlEvents, std::vector<CKAction<UIEvent *>>> _CKComponentDebugControlActionsForComponent(CKComponent *const component)
 {
 #if DEBUG
-  CKComponentActionList *const list = objc_getAssociatedObject(component.viewContext.view, ck_actionListKey);
+  CKComponentActionList *const list = CKGetAssociatedObject_MainThreadAffined(component.viewContext.view, ck_actionListKey);
   if (list == nil) {
     return {};
   }
@@ -400,12 +401,22 @@ void _CKTypedComponentDebugCheckComponentScope(const CKComponentScope &scope, SE
 
 void _CKTypedComponentDebugCheckComponentScopeHandle(CKComponentScopeHandle *handle, SEL selector, const std::vector<const char *> &typeEncodings) noexcept
 {
+  if (handle == nil) {
+    return;
+  }
+
   // In DEBUG mode, we want to do the minimum of type-checking for the action that's possible in Objective-C. We
   // can't do exact type checking, but we can ensure that you're passing the right type of primitives to the right
   // argument indices.
-  const Class klass = handle.componentClass;
+  const Class klass = objc_getClass(handle.componentTypeName);
 
-  _CKTypedComponentDebugCheckComponent(klass, selector, typeEncodings);
+  CKCAssertWithCategory(klass != nil,
+                        [NSString stringWithUTF8String:handle.componentTypeName],
+                        @"Creating an action from a scope should always yield a class");
+
+  if (klass != nil) {
+    _CKTypedComponentDebugCheckComponent(klass, selector, typeEncodings);
+  }
 }
 
 void _CKTypedComponentDebugCheckTargetSelector(id target, SEL selector, const std::vector<const char *> &typeEncodings) noexcept

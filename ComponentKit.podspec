@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'ComponentKit'
-  s.version = '0.29'
+  s.version = '0.30'
   s.license = 'BSD'
   s.summary = 'A React-inspired view framework for iOS'
   s.homepage = 'https://componentkit.org'
@@ -17,6 +17,7 @@ Pod::Spec.new do |s|
     'CLANG_CXX_LANGUAGE_STANDARD' => 'gnu++14',
     'CLANG_CXX_LIBRARY' => 'libc++',
   }
+  s.dependency 'RenderCore', s.version.to_s
   s.dependency 'Yoga', '~> 1.14'
   s.dependency 'RenderCore', '~> 0.29'
 end

@@ -8,20 +8,29 @@
  *
  */
 
-#import <ComponentKit/CKDefines.h>
-
-#if CK_NOT_SWIFT
-
 #import <Foundation/Foundation.h>
+#import <ComponentKit/CKDefines.h>
+#import <ComponentKit/CKComponentCoalescingMode.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @protocol CKComponentControllerProtocol;
 
+NS_SWIFT_NAME(ComponentProtocol)
 @protocol CKComponentProtocol <NSObject>
 
-+ (id)initialState;
+@property (nonatomic, copy, readonly) NSString *className;
+@property (nonatomic, assign, readonly) const char *typeName;
+@property (nonatomic, strong, readonly, class, nullable) id initialState;
+@property (nonatomic, strong, readonly, class, nullable) Class<CKComponentControllerProtocol> controllerClass;
+@property (nonatomic, assign, readonly, class) CKComponentCoalescingMode coalescingMode;
 
-+ (Class<CKComponentControllerProtocol>)controllerClass;
+/*
+ * For internal use only. Please do not use this. Will soon be deprecated.
+ * Overriding this API has undefined behvaiour.
+ */
+- (id<CKComponentControllerProtocol>)buildController;
 
 @end
 
-#endif
+NS_ASSUME_NONNULL_END

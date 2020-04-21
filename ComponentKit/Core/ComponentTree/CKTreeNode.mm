@@ -31,9 +31,6 @@
 @end
 
 @implementation CKTreeNode
-{
-  CKTreeNodeComponentKey _componentKey;
-}
 
 // Base initializer
 - (instancetype)initWithPreviousNode:(id<CKTreeNodeProtocol>)previousNode
@@ -54,14 +51,13 @@
                         scopeRoot:(CKComponentScopeRoot *)scopeRoot
                      stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
 {
-  Class componentClass = [component class];
-  auto const componentKey = [parent createComponentKeyForChildWithClass:componentClass identifier:[component componentIdentifier]];
+  auto const componentKey = [parent createComponentKeyForChildWithTypeName:component.typeName identifier:[component componentIdentifier]];
   auto const previousNode = [previousParent childForComponentKey:componentKey];
 
   // For Render Layout components, the component might have a scope handle already.
   CKComponentScopeHandle *scopeHandle = component.scopeHandle;
   if (scopeHandle == nil) {
-    scopeHandle = CKRender::ScopeHandle::Render::create(component, componentClass, previousNode, scopeRoot, stateUpdates);
+    scopeHandle = CKRender::ScopeHandle::Render::create(component, previousNode, scopeRoot, stateUpdates);
   }
 
   if (self = [self initWithPreviousNode:previousNode scopeHandle:scopeHandle]) {
@@ -73,7 +69,7 @@
     scopeRoot.rootNode.registerNode(self, parent);
     // Set the link between the tree node and the scope handle.
     [scopeHandle setTreeNode:self];
-#if DEBUG
+#if CK_ASSERTIONS_ENABLED
     [component acquireTreeNode:self];
 #endif
   }
@@ -85,14 +81,17 @@
        previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                params:(const CKBuildComponentTreeParams &)params
 {
-  auto const componentKey = [parent createComponentKeyForChildWithClass:[component class] identifier:nil];
+  if (!params.mergeTreeNodesLinks)
+  {
+    auto const componentKey = [parent createComponentKeyForChildWithTypeName:component.typeName identifier:nil];
+    _componentKey = componentKey;
+  }
   _component = component;
-  _componentKey = componentKey;
   // Set the link between the parent and the child.
   [parent setChild:self forComponentKey:_componentKey];
   // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
   params.scopeRoot.rootNode.registerNode(self, parent);
-#if DEBUG
+#if CK_ASSERTIONS_ENABLED
   [component acquireTreeNode:self];
 #endif
 }
@@ -107,9 +106,10 @@
   return _componentKey;
 }
 
-- (void)didReuseInScopeRoot:(CKComponentScopeRoot *)scopeRoot fromPreviousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot
+- (void)didReuseWithParent:(id<CKTreeNodeProtocol>)parent
+               inScopeRoot:(CKComponentScopeRoot *)scopeRoot
+       traverseAllChildren:(BOOL)traverseAllChildren
 {
-  auto const parent = previousScopeRoot.rootNode.parentForNodeIdentifier(_nodeIdentifier);
   CKAssert(parent != nil, @"The parent cannot be nil; every node should have a valid parent.");
   scopeRoot.rootNode.registerNode(self, parent);
   if (_scopeHandle) {
@@ -132,8 +132,8 @@
 
 - (NSArray<NSString *> *)debugDescriptionNodes
 {
-  return @[[NSString stringWithFormat:@"- %@ %d - %@",
-            [_component class],
+  return @[[NSString stringWithFormat:@"- %s %d - %@",
+            _component.typeName,
             _nodeIdentifier,
             self]];
 }

@@ -12,6 +12,7 @@
 
 #import <RenderCore/CKArgumentPrecondition.h>
 #import <RenderCore/CKAssert.h>
+#import <RenderCore/CKAssociatedObject.h>
 #import <RenderCore/CKAvailability.h>
 #import <RenderCore/CKCasting.h>
 #import <RenderCore/CKCollection.h>
@@ -32,7 +33,6 @@
 #import <RenderCore/CKInternalHelpers.h>
 #import <RenderCore/CKIterable.h>
 #import <RenderCore/CKLayout.h>
-#import <RenderCore/CKLinkable.h>
 #import <RenderCore/CKMacros.h>
 #import <RenderCore/CKMountable.h>
 #import <RenderCore/CKMountableHelpers.h>

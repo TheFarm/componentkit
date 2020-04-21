@@ -18,7 +18,6 @@
 #import <ComponentKit/CKComponentRootViewInternal.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKNonNull.h>
-#import <ComponentKit/ComponentRootViewPool.h>
 
 @protocol CKComponentRootLayoutProvider;
 
@@ -45,50 +44,7 @@
  */
 - (void)detachAll;
 
-/**
- A root view pool that is used for attaching component layout when `CKComponentAttachableView` is passed in.
- @see CKComponentAttachableView
- */
-- (void)setRootViewPool:(CK::Component::RootViewPool)rootViewPool;
-
-/**
- Calling this method pushes all root views that this attach controller holds to the root view pool immediately
- instead of pushing them upon deallocation.
- */
-- (void)pushRootViewsToViewPool;
-
 @end
-
-/**
- This is used as unified parameter of a attachable view. It could be either a `UIView` or a `CKComponentRootViewHost`.
- When a `CKComponentRootViewHost` is used, it's expected to reuse view from a `CK::Component::RootViewPool`.
- */
-struct CKComponentAttachableView {
-  CKComponentAttachableView(UIView *view) :
-  _view(view),
-  _rootViewHost(nil),
-  _rootViewCategory(nil) {};
-
-  CKComponentAttachableView(CK::NonNull<id<CKComponentRootViewHost>> rootViewHost,
-                            CK::NonNull<NSString *> rootViewCategory) :
-  _view(nil),
-  _rootViewHost(rootViewHost),
-  _rootViewCategory(rootViewCategory) {};
-
-  template <typename ViewFunc, typename RootViewHostFunc>
-  CK::NonNull<UIView *> match(ViewFunc viewFunc, RootViewHostFunc rootViewHostFunc) const {
-    if (_view) {
-      return viewFunc(CK::makeNonNull(_view));
-    } else {
-      return rootViewHostFunc(CK::makeNonNull(_rootViewHost), CK::makeNonNull(_rootViewCategory));
-    }
-  }
-
-private:
-  UIView *_view;
-  id<CKComponentRootViewHost> _rootViewHost;
-  NSString *_rootViewCategory;
-};
 
 /**
  Attaching a component tree to a view, the controller will:
@@ -96,16 +52,16 @@ private:
  2) Detach the component tree currently attached to the view, if and only if the component tree currently attached has a different
  scope identifier.
 
- @param rootLayout The component (and layout) tree to attach.
- @param view The view to attach the component tree to
- @param scopeIdentifier The scope identifier for the component tree, this identifier should be stable among multiple versions
+ @field rootLayout The component (and layout) tree to attach.
+ @field view The view to attach the component tree to
+ @field scopeIdentifier The scope identifier for the component tree, this identifier should be stable among multiple versions
  of the component tree representing the same logical item.
  */
 struct CKComponentAttachControllerAttachComponentRootLayoutParams {
   const id<CKComponentRootLayoutProvider> layoutProvider;
   CKComponentScopeRootIdentifier scopeIdentifier;
   const CKComponentBoundsAnimation &boundsAnimation;
-  const CKComponentAttachableView view;
+  UIView *view;
   id<CKAnalyticsListener> analyticsListener;
   BOOL isUpdate;
 };

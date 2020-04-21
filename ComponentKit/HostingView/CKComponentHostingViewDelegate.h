@@ -8,14 +8,13 @@
  *
  */
 
-#import <ComponentKit/CKDefines.h>
-
-#if CK_NOT_SWIFT
-
 #import <Foundation/Foundation.h>
 
-@class CKComponentHostingView;
+@class UIView;
 
+NS_ASSUME_NONNULL_BEGIN
+
+NS_SWIFT_NAME(ComponentHostingViewDelegate)
 @protocol CKComponentHostingViewDelegate <NSObject>
 @required
 /**
@@ -24,7 +23,7 @@
  The delegate can use this callback to appropriately resize the view frame to fit the new
  component size. The view will not resize itself.
  */
-- (void)componentHostingViewDidInvalidateSize:(CKComponentHostingView *)hostingView;
+- (void)componentHostingViewDidInvalidateSize:(UIView *)hostingView;
 @end
 
-#endif
+NS_ASSUME_NONNULL_END

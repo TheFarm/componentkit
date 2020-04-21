@@ -17,6 +17,7 @@
 #import <ComponentKit/CKContainerWrapper.h>
 #import <ComponentKit/CKLayoutComponent.h>
 #import <ComponentKit/CKMacros.h>
+#import <ComponentKit/CKOptional.h>
 
 typedef NS_ENUM(NSInteger, CKFlexboxDirection) {
   CKFlexboxDirectionColumn,
@@ -263,6 +264,14 @@ struct CKFlexboxComponentStyle {
    If set to NO, will allocate a yoga node for every single child even it is backed by yoga as well
    */
   BOOL useDeepYogaTrees = NO;
+  
+  /**
+   If set to YES, flexbox will use the composite component child size to assign size
+   properties on yoga node instead of the size of composite component itself.
+   
+   This is a temporary flag used for migration purposes.
+   */
+  CK::Optional<BOOL> skipCompositeComponentSize;
 };
 
 struct CKFlexboxComponentChild {

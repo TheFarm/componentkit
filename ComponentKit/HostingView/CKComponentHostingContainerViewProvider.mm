@@ -51,11 +51,6 @@ private:
 
 @end
 
-@interface CKComponentHostingContainerViewHost : NSObject <CKComponentRootViewHost>
-
-- (CKComponentHostingContainerView *)hostingContainerView;
-
-@end
 
 @implementation CKComponentHostingContainerViewProvider
 {
@@ -66,7 +61,7 @@ private:
   CKComponentHostingContainerLayoutProvider *_layoutProvider;
   CKComponentBoundsAnimation _boundsAnimation;
 
-  CK::DelayedNonNull<CKComponentHostingContainerViewHost *> _containerViewHost;
+  CK::DelayedNonNull<CKComponentHostingContainerView *> _containerView;
   CKComponentAttachController *_attachController;
   BOOL _needsMount;
 }
@@ -76,41 +71,32 @@ private:
             analyticsListener:(id<CKAnalyticsListener>)analyticsListener
             sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
           allowTapPassthrough:(BOOL)allowTapPassthrough
-          rootViewPoolOptions:(CK::Optional<CKComponentHostingViewRootViewPoolOptions>)rootViewPoolOptions
 {
   if (self = [super init]) {
     _scopeIdentifier = scopeIdentifier;
     _analyticsListener = analyticsListener;
 
-    _containerViewHost = CK::makeNonNull([CKComponentHostingContainerViewHost new]);
     _attachController = [CKComponentAttachController new];
 
-    rootViewPoolOptions.apply([&](const auto &options) {
-      [_attachController setRootViewPool:options.rootViewPool];
-      CKUpdateComponentRootViewHost(_containerViewHost, options.rootViewCategory, CK::makeNonNull(_attachController));
-    });
-
-    if (![_containerViewHost rootView]) { // In the case root view pool is not used.
-      [_containerViewHost setRootView:[_containerViewHost createRootView]];
-    }
-    const auto containerView = [_containerViewHost hostingContainerView];
-    containerView.frame = frame;
-    [containerView setAnalyticsListener:analyticsListener];
-    [containerView setSizeRangeProvider:sizeRangeProvider];
-    [containerView setAllowTapPassthrough:allowTapPassthrough];
+    _containerView = CK::makeNonNull([CKComponentHostingContainerView new]);
+    [_containerView setFrame:frame];
+    [_containerView setAnalyticsListener:analyticsListener];
+    [_containerView setSizeRangeProvider:sizeRangeProvider];
+    [_containerView setAllowTapPassthrough:allowTapPassthrough];
   }
   return self;
 }
 
 - (UIView *)containerView
 {
-  return [_containerViewHost hostingContainerView];
+  return _containerView;
 }
 
 - (void)setRootLayout:(const CKComponentRootLayout &)rootLayout
 {
   CKAssertMainThread();
-  _previousLayoutProvider = _layoutProvider;
+  // In the case when layout has no chance to be mounted, we need to make sure the correct previous layout is still retained.
+  _previousLayoutProvider = _previousLayoutProvider ?: _layoutProvider;
   _layoutProvider = [[CKComponentHostingContainerLayoutProvider alloc] initWithRootLayout:rootLayout];
   _needsMount = YES;
 }
@@ -124,7 +110,7 @@ private:
 - (void)setComponent:(CKComponent *)component
 {
   CKAssertMainThread();
-  [[_containerViewHost hostingContainerView] setComponent:component];
+  [_containerView setComponent:component];
 }
 
 - (void)mount
@@ -143,7 +129,7 @@ private:
     .layoutProvider = _layoutProvider,
     .scopeIdentifier = _scopeIdentifier,
     .boundsAnimation = _boundsAnimation,
-    .view = [_containerViewHost hostingContainerView],
+    .view = _containerView,
     .analyticsListener = _analyticsListener,
   });
   _previousLayoutProvider = nil;
@@ -180,15 +166,6 @@ private:
   Optional<CKComponentHostingContainerViewSizeCache> _sizeCache;
 }
 
-- (void)willEnterViewPool
-{
-  [super willEnterViewPool];
-  _analyticsListener = nil;
-  _sizeRangeProvider = nil;
-  _component = nil;
-  _sizeCache = none;
-}
-
 - (void)setAnalyticsListener:(id<CKAnalyticsListener>)analyticsListener
 {
   _analyticsListener = analyticsListener;
@@ -223,35 +200,6 @@ private:
   }).valueOr(computeSize);
   _sizeCache = CKComponentHostingContainerViewSizeCache {constrainedSize, computedSize};
   return computedSize;
-}
-
-@end
-
-@implementation CKComponentHostingContainerViewHost
-
-- (CKComponentHostingContainerView *)hostingContainerView
-{
-  if (!self.rootView) {
-    return nil;
-  }
-  return CK::objCForceCast<CKComponentHostingContainerView>(self.rootView);
-}
-
-#pragma mark - CKComponentRootViewHost
-
-@synthesize rootViewCategory = _rootViewCategory;
-@synthesize rootView = _rootView;
-
-- (CK::NonNull<CKComponentRootView *>)createRootView
-{
-  return CK::makeNonNull([CKComponentHostingContainerView new]);
-}
-
-- (void)rootViewWillEnterViewPool
-{
-  [_rootView removeFromSuperview];
-  _rootView = nil;
-  _rootViewCategory = nil;
 }
 
 @end

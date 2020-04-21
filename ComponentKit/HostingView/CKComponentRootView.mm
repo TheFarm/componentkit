@@ -27,11 +27,6 @@ static NSMutableArray *hitTestHooks;
   _allowTapPassthrough = allowTapPassthrough;
 }
 
-- (void)willEnterViewPool
-{
-  // Subclass should override this to release resource.
-}
-
 + (void)addHitTestHook:(CKComponentRootViewHitTestHook)hook
 {
   CKAssertMainThread();
@@ -73,6 +68,12 @@ static NSMutableArray *hitTestHooks;
   // to simply be a concrete method on this class, instead of a category.
   CKComponentAttachState *const attachState = CKGetAttachStateForView(self);
   return attachState ? CKComponentAttachStateRootLayout(attachState).layout() : CKComponentLayout();
+}
+
+- (id<NSObject>)uniqueIdentifier
+{
+  auto const scopeRootIdentifier = CKGetAttachStateForView(self).scopeIdentifier;
+  return scopeRootIdentifier > 0 ? @(scopeRootIdentifier) : nil;
 }
 
 @end

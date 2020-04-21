@@ -11,13 +11,20 @@
 #import "CKComponentScope.h"
 
 #import "CKAnalyticsListener.h"
-#import "CKCompositeComponent.h"
-#import "CKComponentScopeFrame.h"
 #import "CKComponentScopeHandle.h"
 #import "CKComponentScopeRoot.h"
 #import "CKThreadLocalComponentScope.h"
 #import "CKScopeTreeNode.h"
 #import "CKTreeNodeProtocol.h"
+
+#import <ComponentKit/CKRenderHelpers.h>
+#import <ComponentKit/CKCoalescedSpecSupport.h>
+
+static auto toInitialStateCreator(id (^initialStateCreator)(void), Class componentClass) {
+  return initialStateCreator ?: ^{
+    return [componentClass initialState];
+  };
+}
 
 CKComponentScope::~CKComponentScope()
 {
@@ -25,33 +32,53 @@ CKComponentScope::~CKComponentScope()
     [_scopeHandle resolve];
 
     if (_threadLocalScope->systraceListener) {
-      auto const componentClass = _threadLocalScope->stack.top().frame.scopeHandle.componentClass;
-      [_threadLocalScope->systraceListener didBuildComponent:componentClass];
+      auto const componentTypeName = _threadLocalScope->stack.top().node.scopeHandle.componentTypeName ?: "UnkownTypeName";
+      CKCAssertWithCategory(objc_getClass(componentTypeName) != nil,
+                            [NSString stringWithUTF8String:componentTypeName],
+                            @"Creating an action from a scope should always yield a class");
+
+      [_threadLocalScope->systraceListener didBuildComponent:componentTypeName];
     }
 
-    _threadLocalScope->stack.pop();
-    CKCAssert(_threadLocalScope->keys.top().empty(), @"Expected keys to be cleared by destructor time");
-    _threadLocalScope->keys.pop();
+    _threadLocalScope->pop(YES, YES);
   }
 }
 
 CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id identifier, id (^initialStateCreator)(void)) noexcept
 {
+  CKCAssert(class_isMetaClass(object_getClass(componentClass)), @"Expected %@ to be a meta class", componentClass);
   _threadLocalScope = CKThreadLocalComponentScope::currentScope();
   if (_threadLocalScope != nullptr) {
+    const auto componentTypeName = class_getName(componentClass);
 
-    [_threadLocalScope->systraceListener willBuildComponent:componentClass];
+    [_threadLocalScope->systraceListener willBuildComponent:componentTypeName];
 
-    const auto childPair = [CKScopeTreeNode childPairForPair:_threadLocalScope->stack.top()
+    const auto& pair = _threadLocalScope->stack.top();
+
+    const auto childPair = [CKScopeTreeNode childPairForPair:pair
                                                      newRoot:_threadLocalScope->newScopeRoot
-                                              componentClass:componentClass
+                                           componentTypeName:componentTypeName
                                                   identifier:identifier
                                                         keys:_threadLocalScope->keys.top()
-                                         initialStateCreator:initialStateCreator
-                                                stateUpdates:_threadLocalScope->stateUpdates];
-    _threadLocalScope->stack.push({.frame = childPair.frame, .previousFrame = childPair.previousFrame});
-    _scopeHandle = childPair.frame.scopeHandle;
-    _threadLocalScope->keys.push({});
+                                         initialStateCreator:toInitialStateCreator(initialStateCreator, componentClass)
+                                                stateUpdates:_threadLocalScope->stateUpdates
+                                         mergeTreeNodesLinks:_threadLocalScope->mergeTreeNodesLinks
+                                         requiresScopeHandle:YES];
+    _scopeHandle = childPair.node.scopeHandle;
+
+    const auto ancestorHasStateUpdate =
+        (_threadLocalScope->coalescingMode == CKComponentCoalescingModeComposite &&
+         _threadLocalScope->enableComponentReuseOptimizations &&
+         _threadLocalScope->buildTrigger != CKBuildTrigger::NewTree)
+        ? (_threadLocalScope->ancestorHasStateUpdate.top() ||
+           CKRender::componentHasStateUpdate(
+               childPair.node.scopeHandle,
+               pair.previousNode,
+               _threadLocalScope->buildTrigger,
+               _threadLocalScope->stateUpdates))
+        : true;
+
+    _threadLocalScope->push({.node = childPair.node, .previousNode = childPair.previousNode}, YES, ancestorHasStateUpdate);
   }
   CKCAssertWithCategory(_threadLocalScope != nullptr,
                         NSStringFromClass(componentClass),

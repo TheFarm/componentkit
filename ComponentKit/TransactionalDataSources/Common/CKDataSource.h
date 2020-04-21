@@ -29,16 +29,6 @@
 @protocol CKDataSourceListener;
 @protocol CKDataSourceStateModifying;
 
-@protocol CKDataSourceChangesetModificationGenerator
-
--(id<CKDataSourceStateModifying>)changesetGenerationModificationForChangeset:(CKDataSourceChangeset *)changeset
-                                                                    userInfo:(NSDictionary *)userInfo
-                                                                         qos:(CKDataSourceQOS)qos
-                                                               stateListener:(id<CKComponentStateListener>)stateListener;
-
-
-@end
-
 /**
  Describes the currently visible viewport for content rendered by the data source -- this is used to optimize
  component mounting so that components inside the viewport get mounted as soon as possible.
@@ -58,7 +48,7 @@ struct CKDataSourceViewport {
 @interface CKDataSource : NSObject <CKComponentStateListener>
 
 /**
- @param configuration @see CKDataSourceConfiguration.
+ @param configuration An immutable configuration object used to create the data source (@see CKDataSourceConfiguration).
  */
 - (instancetype)initWithConfiguration:(CKDataSourceConfiguration *)configuration;
 
@@ -105,12 +95,6 @@ struct CKDataSourceViewport {
 
 - (void)addListener:(id<CKDataSourceListener>)listener;
 - (void)removeListener:(id<CKDataSourceListener>)listener;
-
-/*
- Allows the overriding of the generation of a changeset modification. If this is not called it will
- defer to the default behavior.
- */
-- (void)setChangesetModificationGenerator:(id<CKDataSourceChangesetModificationGenerator>)changesetModificationGenerator;
 
 @end
 

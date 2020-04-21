@@ -14,6 +14,7 @@
 #import <stdatomic.h>
 
 #import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKScopeTreeNode.h>
 #import <ComponentKit/CKMutex.h>
 
 #import "CKComponentScopeRoot.h"
@@ -49,7 +50,7 @@
   // We can rely on this infomration to increase the `componentAllocations` counter.
   currentScope->componentAllocations++;
 
-  CKComponentScopeHandle *handle = currentScope->stack.top().frame.scopeHandle;
+  CKComponentScopeHandle *handle = currentScope->stack.top().node.scopeHandle;
   if ([handle acquireFromComponent:component]) {
     [currentScope->newScopeRoot registerComponent:component];
     return handle;
@@ -64,14 +65,14 @@
 
 - (instancetype)initWithListener:(id<CKComponentStateListener>)listener
                   rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
-                  componentClass:(Class)componentClass
+               componentTypeName:(const char *)componentTypeName
                     initialState:(id)initialState
 {
   static atomic_int nextGlobalIdentifier = 0;
   return [self initWithListener:listener
                globalIdentifier:atomic_fetch_add_explicit(&nextGlobalIdentifier, 1, memory_order_relaxed)
                  rootIdentifier:rootIdentifier
-                 componentClass:componentClass
+              componentTypeName:componentTypeName
                           state:initialState
                      controller:nil  // Controllers are built on resolution of the handle.
                 scopedResponder:nil];  // Scoped responders are created lazily. Once they exist, we use that reference for future handles.
@@ -80,7 +81,7 @@
 - (instancetype)initWithListener:(id<CKComponentStateListener>)listener
                 globalIdentifier:(CKComponentScopeHandleIdentifier)globalIdentifier
                   rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
-                  componentClass:(Class<CKComponentProtocol>)componentClass
+               componentTypeName:(const char *)componentTypeName
                            state:(id)state
                       controller:(id<CKComponentControllerProtocol>)controller
                  scopedResponder:(CKScopedResponder *)scopedResponder
@@ -89,7 +90,7 @@
     _listener = listener;
     _globalIdentifier = globalIdentifier;
     _rootIdentifier = rootIdentifier;
-    _componentClass = componentClass;
+    _componentTypeName = componentTypeName;
     _state = state;
     _controller = controller;
 
@@ -116,7 +117,7 @@
   return [[CKComponentScopeHandle alloc] initWithListener:_listener
                                          globalIdentifier:_globalIdentifier
                                            rootIdentifier:_rootIdentifier
-                                           componentClass:_componentClass
+                                        componentTypeName:_componentTypeName
                                                     state:updatedState
                                                controller:_controller
                                           scopedResponder:_scopedResponder];
@@ -165,7 +166,7 @@
 
 - (BOOL)acquireFromComponent:(id<CKComponentProtocol>)component
 {
-  if (!_acquired && [component isMemberOfClass:_componentClass]) {
+  if (!_acquired && component.typeName == _componentTypeName) {
     _acquired = YES;
     _acquiredComponent = component;
     return YES;
@@ -176,7 +177,7 @@
 
 - (void)forceAcquireFromComponent:(id<CKComponentProtocol>)component
 {
-  CKAssert([component isMemberOfClass:_componentClass], @"%@ has to be a member of %@ class", component, _componentClass);
+  CKAssert(component.typeName == _componentTypeName, @"%s has to be a member of %s class", component.typeName, _componentTypeName);
   CKAssert(!_acquired, @"scope handle cannot be acquired twice");
   _acquired = YES;
   _acquiredComponent = component;
@@ -194,15 +195,13 @@
 - (void)resolve
 {
   CKAssertFalse(_resolved);
+  // Strong ref
+  const auto acquiredComponent = _acquiredComponent;
   // _acquiredComponent may be nil if a component scope was declared before an early return. In that case, the scope
   // handle will not be acquired, and we should avoid creating a component controller for the nil component.
-  if (!_controller && _acquiredComponent) {
-    const Class<CKComponentControllerProtocol> controllerClass = [_acquiredComponent.class controllerClass];
-    if (controllerClass) {
-      // The compiler is not happy when I don't explicitly cast as (Class)
-      // See: http://stackoverflow.com/questions/21699755/create-an-instance-from-a-class-that-conforms-to-a-protocol
-      _controller = [[(Class)controllerClass alloc] initWithComponent:_acquiredComponent];
-
+  if (!_controller && acquiredComponent) {
+    _controller = [acquiredComponent buildController];
+    if (_controller) {
       CKThreadLocalComponentScope *const currentScope = CKThreadLocalComponentScope::currentScope();
       if (currentScope) {
         [currentScope->newScopeRoot registerComponentController:_controller];

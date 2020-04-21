@@ -22,7 +22,6 @@
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKInspectableView.h>
 #import <ComponentKit/CKOptional.h>
-#import <ComponentKit/ComponentRootViewPool.h>
 
 #import <unordered_set>
 
@@ -34,33 +33,9 @@ struct CKComponentHostingViewOptions {
   /// A initial size that will be used for hosting view before first generation of component is created.
   /// Specifying a initial size enables the ability to handle the first model/context update asynchronously.
   CK::Optional<CGSize> initialSize;
-  /// A root view pool that hosting view can retrieve its container view from.
-  CK::Optional<CK::Component::RootViewPool> rootViewPool =
-  CKReadGlobalConfig().enableGlobalRootViewPoolInHostingView
-  ? CK::Optional<CK::Component::RootViewPool>(CK::Component::GlobalRootViewPool())
-  : CK::none;
 };
 
 @interface CKComponentHostingView<__covariant ModelType: id<NSObject>, __covariant ContextType: id<NSObject>> () <CKComponentHostingViewProtocol>
-
-/**
- @param componentProvider  provider conforming to CKComponentProvider protocol.
- @param sizeRangeProvider sizing range provider conforming to CKComponentSizeRangeProviding.
- @param componentPredicates A vector of C functions that are executed on each component constructed within the scope
-                            root. By passing in the predicates on initialization, we are able to cache which components
-                            match the predicate for rapid enumeration later.
- @param componentControllerPredicates Same as componentPredicates above, but for component controllers.
- @param analyticsListener listener conforming to AnalyticsListener will be used to get component lifecycle callbacks for logging
- @param options Set of CKComponentHostingViewOptions
- @see CKComponentProvider
- @see CKComponentSizeRangeProviding
- */
-- (instancetype)initWithComponentProvider:(Class<CKComponentProvider>)componentProvider
-                        sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider
-                      componentPredicates:(const std::unordered_set<CKComponentPredicate> &)componentPredicates
-            componentControllerPredicates:(const std::unordered_set<CKComponentControllerPredicate> &)componentControllerPredicates
-                        analyticsListener:(id<CKAnalyticsListener>)analyticsListener
-                                  options:(const CKComponentHostingViewOptions &)options;
 
 - (instancetype)initWithComponentProviderFunc:(CKComponent *(*)(ModelType model, ContextType context))componentProvider
                             sizeRangeProvider:(id<CKComponentSizeRangeProviding>)sizeRangeProvider

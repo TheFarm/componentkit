@@ -51,22 +51,13 @@
                               supercomponent:(CKComponent *)supercomponent NS_REQUIRES_SUPER;
 
 /**
- For internal use only; don't use this initializer.
-
- @param view A struct describing the view for this component. Pass {} to specify that no view should be created.
- @param size A size constraint that should apply to this component. Pass {} to specify no size constraint.
-
- This initializer will not try to acquire the scope handle from the thread local store.
- */
-+ (instancetype)newRenderComponentWithView:(const CKComponentViewConfiguration &)view
-                                      size:(const CKComponentSize &)size;
-
-/**
  For internal use only; don't use this directly.
  */
 - (void)setViewConfiguration:(const CKComponentViewConfiguration &)viewConfiguration;
 
 - (id)nextResponderAfterController;
+
+- (void)didFinishComponentInitialization;
 
 /**
  A CKComponentViewConfiguration specifies the class of a view and the attributes that should be applied to it.
@@ -82,17 +73,17 @@
 /** Used to get the scope root enumerator; during component creation only */
 @property (nonatomic, strong, readonly) id<CKComponentScopeEnumeratorProvider> scopeEnumeratorProvider;
 
-/** For internal use only; don't touch this. */
-@property (nonatomic, strong, readonly) CKComponentScopeHandle *scopeHandle;
-
 /** For internal debug use only; don't touch this. */
-- (NSString *)backtraceStackDescription;
+@property (nonatomic, copy, readonly) NSString *backtraceStackDescription;
 
-/**
- Update component in controller right after new generation is created.
- NOTE: This should only be used by ComponentKit infra.
- */
-+ (BOOL)shouldUpdateComponentInController;
+/** For internal use; don't touch this. */
+@property (nonatomic, assign, readonly) BOOL hasAnimations;
+
+/** For internal use; don't touch this. */
+@property (nonatomic, assign, readonly) BOOL hasBoundsAnimations;
+
+/** For internal use; don't touch this. */
+@property (nonatomic, assign, readonly) BOOL controllerOverridesDidPrepareLayout;
 
 @end
 

@@ -8,11 +8,9 @@
  *
  */
 
+#import <Foundation/Foundation.h>
 #import <ComponentKit/CKDefines.h>
-
-#if CK_NOT_SWIFT
-
-#import <ComponentKit/CKSingleChildComponent.h>
+#import <ComponentKit/CKComponent.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -29,7 +27,18 @@ NS_ASSUME_NONNULL_BEGIN
 
  @warning Overriding -layoutThatFits:parentSize: or -computeLayoutThatFits: is **not allowed** for any subclass.
  */
-@interface CKCompositeComponent : CKSingleChildComponent
+NS_SWIFT_NAME(CompositeComponent)
+@interface CKCompositeComponent : CKComponent
+
+CK_COMPONENT_INIT_UNAVAILABLE;
+
+// TODO: Remove when `-initWithView:component` is exposed to Swift.
+- (instancetype _Nullable)initWithComponent:(NS_RELEASES_ARGUMENT CKComponent *_Nullable)component CK_SWIFT_DESIGNATED_INITIALIZER;
+
+#if CK_NOT_SWIFT
+
+- (instancetype _Nullable)initWithView:(const CKComponentViewConfiguration &)view
+                             component:(NS_RELEASES_ARGUMENT CKComponent  * _Nullable)component NS_DESIGNATED_INITIALIZER;
 
 /** Calls the initializer with {} for view. */
 + (instancetype _Nullable)newWithComponent:(NS_RELEASES_ARGUMENT CKComponent * _Nullable)component;
@@ -41,15 +50,24 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (instancetype _Nullable)newWithView:(const CKComponentViewConfiguration &)view component:(NS_RELEASES_ARGUMENT CKComponent  * _Nullable)component;
 
+#endif
+
+/** Access the child component. For internal use only. */
+@property (nonatomic, strong, readonly, nullable) CKComponent *child;
+
 @end
 
+#if CK_SWIFT
 #define CK_COMPOSITE_COMPONENT_INIT_UNAVAILABLE \
-CK_COMPONENT_INIT_UNAVAILABLE; \
-+ (instancetype _Nullable)newWithComponent:(NS_RELEASES_ARGUMENT CKComponent * _Nullable)component NS_UNAVAILABLE; \
-+ (instancetype _Nullable)newWithView:(const CKComponentViewConfiguration &)view component:(NS_RELEASES_ARGUMENT CKComponent  * _Nullable)component NS_UNAVAILABLE
+  - (instancetype _Nullable)initWithComponent:(NS_RELEASES_ARGUMENT CKComponent *_Nullable)component NS_UNAVAILABLE
+#else
+#define CK_COMPOSITE_COMPONENT_INIT_UNAVAILABLE \
+  - (instancetype _Nullable)initWithView:(const CKComponentViewConfiguration &)view \
+                               component:(NS_RELEASES_ARGUMENT CKComponent  * _Nullable)component NS_UNAVAILABLE; \
+  + (instancetype _Nullable)newWithComponent:(NS_RELEASES_ARGUMENT CKComponent * _Nullable)component NS_UNAVAILABLE; \
+  + (instancetype _Nullable)newWithView:(const CKComponentViewConfiguration &)view component:(NS_RELEASES_ARGUMENT CKComponent  * _Nullable)component NS_UNAVAILABLE;
+#endif
 
 NS_ASSUME_NONNULL_END
 
 #import <ComponentKit/CompositeComponentBuilder.h>
-
-#endif
