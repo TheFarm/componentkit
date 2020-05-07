@@ -47,8 +47,7 @@ NS_ASSUME_NONNULL_BEGIN
                     initialState:(id _Nullable)initialState;
 
 /** Creates a new instance of the scope handle that incorporates the given state updates. */
-- (instancetype)newHandleWithStateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-                       componentScopeRoot:(CKComponentScopeRoot *)componentScopeRoot;
+- (instancetype)newHandleWithStateUpdates:(const CKComponentStateUpdateMap &)stateUpdates;
 
 /** Enqueues a state update to be applied to the scope with the given mode. */
 - (void)updateState:(id _Nullable (^)(id _Nullable))updateBlock
@@ -59,10 +58,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)replaceState:(id _Nullable)state;
 
 /** Informs the scope handle that it should complete its configuration. This will generate the controller */
-- (void)resolve;
+- (void)resolveInScopeRoot:(CKComponentScopeRoot *)scopeRoot;
 
 /** Acquire component, assert if the scope handle is wrong */
 - (void)forceAcquireFromComponent:(id<CKComponentProtocol>)component;
+
+/** Clears the acquired component. Used in some cases for render to nil. */
+- (void)relinquishComponent;
 
 /**
  Should not be called until after handleForComponent:. The controller will assert (if assertions are compiled), and

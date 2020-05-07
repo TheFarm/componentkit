@@ -13,6 +13,7 @@
 #if CK_NOT_SWIFT
 
 #import <Foundation/Foundation.h>
+#import <RenderCore/CKComponentCoalescingMode.h>
 
 @protocol CKAnalyticsListener;
 
@@ -32,6 +33,14 @@ struct CKGlobalConfig {
    Avoid duplicate links in the tree nodes for owner/parent based nodes
    */
   BOOL mergeTreeNodesLinks = NO;
+  /**
+   Use new method of performing optimistic mutations which can last beyond next mount
+   */
+  BOOL useNewStyleOptimisticMutations = NO;
+  /**
+   Component coalescing mode.
+   */
+   CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone;
 };
 
 CKGlobalConfig CKReadGlobalConfig();

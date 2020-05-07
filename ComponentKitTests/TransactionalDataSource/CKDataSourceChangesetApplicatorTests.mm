@@ -333,7 +333,10 @@ static CKComponent *componentProvider(id<NSObject> model, id<NSObject> context)
 
 }
 
-- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component
+- (void)didCollectAnimations:(const CKComponentAnimations &)animations
+              fromComponents:(const CK::ComponentTreeDiff &)animatedComponents
+inComponentTreeWithRootComponent:(id<CKMountable>)component
+         scopeRootIdentifier:(CKComponentScopeRootIdentifier)scopeRootID
 {
 
 }
@@ -388,6 +391,10 @@ fromPreviousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot
 {
 
 }
+
+- (void)didReceiveStateUpdateFromScopeHandle:(CKComponentScopeHandle *)handle rootIdentifier:(CKComponentScopeRootIdentifier)rootID {
+}
+
 
 #pragma mark - Helpers
 

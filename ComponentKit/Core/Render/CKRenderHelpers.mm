@@ -38,10 +38,11 @@ namespace CKRenderInternal {
     // Update the previous component.
     prevChildComponent = [(id<CKRenderWithChildComponentProtocol>)previousNode.component child];
     // Update the render node of the component reuse.
+    const auto traverseAllChildren = params.mergeTreeNodesLinks || params.coalescingMode == CKComponentCoalescingModeComposite;
     [node didReuseRenderNode:previousNode
                    scopeRoot:params.scopeRoot
            previousScopeRoot:params.previousScopeRoot
-         traverseAllChildren:params.mergeTreeNodesLinks];
+         traverseAllChildren:traverseAllChildren];
 
     if (childComponent != nullptr) {
       // Link the previous child component to the the new component.
@@ -158,7 +159,7 @@ static auto didBuildComponentTree(id<CKTreeNodeProtocol> node,
     CKComponentContextHelper::didBuildComponentTree(component);
 
     // Props updates and context support
-    params.scopeRoot.rootNode.didBuildComponentTree(node);
+    params.scopeRoot.rootNode.didBuildComponentTree();
 
     // Systrace logging
     [params.systraceListener didBuildComponent:component.typeName];
@@ -193,7 +194,7 @@ namespace CKRender {
       // Update the `parentHasStateUpdate` param for Faster state/props updates.
       // TODO: Share this value with the value precomputed in the scope
       parentHasStateUpdate = parentHasStateUpdate ||
-      (params.buildTrigger != CKBuildTrigger::NewTree &&
+      (params.buildTrigger == CKBuildTrigger::StateUpdate &&
        CKRender::componentHasStateUpdate(component.scopeHandle,
                                          previousParent,
                                          params.buildTrigger,
@@ -246,7 +247,7 @@ namespace CKRender {
                            parent:parent
                            previousParent:previousParent
                            scopeRoot:params.scopeRoot
-                           stateUpdates:params.stateUpdates];;
+                           stateUpdates:params.stateUpdates];
 
         // Faster Props updates and context support
         params.scopeRoot.rootNode.willBuildComponentTree(node);
@@ -262,7 +263,7 @@ namespace CKRender {
 
         // Update the `parentHasStateUpdate` param for Faster state/props updates.
         parentHasStateUpdate = parentHasStateUpdate ||
-        (params.buildTrigger != CKBuildTrigger::NewTree &&
+        (params.buildTrigger == CKBuildTrigger::StateUpdate &&
          CKRender::componentHasStateUpdate(node.scopeHandle,
                                            previousParent,
                                            params.buildTrigger,
@@ -315,8 +316,7 @@ namespace CKRender {
         CKComponentScopeHandle *scopeHandle;
         // If there is a previous node, we just duplicate the scope handle.
         if (previousNode) {
-          scopeHandle = [previousNode.scopeHandle newHandleWithStateUpdates:stateUpdates
-                                                         componentScopeRoot:scopeRoot];
+          scopeHandle = [previousNode.scopeHandle newHandleWithStateUpdates:stateUpdates];
         } else {
           // The component needs a scope handle in few cases:
           // 1. Has an initial state
@@ -330,11 +330,10 @@ namespace CKRender {
           }
         }
 
-        // Finalize the node/scope regsitration.
+        // Finalize the node/scope registration.
         if (scopeHandle) {
           [component acquireScopeHandle:scopeHandle];
-          [scopeRoot registerComponent:component];
-          [scopeHandle resolve];
+          [scopeHandle resolveInScopeRoot:scopeRoot];
         }
 
         return scopeHandle;

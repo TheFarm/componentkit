@@ -12,6 +12,8 @@
 
 #import <ComponentKit/CKComponentScopeRoot.h>
 
+using namespace CK::AnalyticsListenerSpy;
+
 @implementation CKAnalyticsListenerSpy
 
 - (void)willBuildComponentTreeWithScopeRoot:(CKComponentScopeRoot *)scopeRoot
@@ -44,7 +46,10 @@
   _willCollectAnimationsHitCount++;
 }
 
-- (void)didCollectAnimationsFromComponentTreeWithRootComponent:(id<CKMountable>)component
+- (void)didCollectAnimations:(const CKComponentAnimations &)animations
+              fromComponents:(const CK::ComponentTreeDiff &)animatedComponents
+inComponentTreeWithRootComponent:(id<CKMountable>)component
+         scopeRootIdentifier:(CKComponentScopeRootIdentifier)scopeRootID
 {
   _didCollectAnimationsHitCount++;
 }
@@ -79,5 +84,10 @@
 - (BOOL)shouldCollectMountInformationForRootComponent:(CKComponent *)component { return YES; }
 
 - (void)didReuseNode:(id<CKTreeNodeProtocol>)node inScopeRoot:(CKComponentScopeRoot *)scopeRoot fromPreviousScopeRoot:(CKComponentScopeRoot *)previousScopeRoot {}
+
+- (void)didReceiveStateUpdateFromScopeHandle:(CKComponentScopeHandle *)handle rootIdentifier:(CKComponentScopeRootIdentifier)rootID {
+  _events.push_back(DidReceiveStateUpdate{handle, rootID});
+}
+
 
 @end

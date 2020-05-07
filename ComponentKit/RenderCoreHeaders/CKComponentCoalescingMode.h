@@ -8,18 +8,4 @@
  *
  */
 
-#import "CKComponentCreationValidation.h"
-
-#if CK_ASSERTIONS_ENABLED
-@implementation CKComponentCreationValidationContext
-
-- (instancetype)initWithSource:(CKComponentCreationValidationSource)source
-{
-  if (self = [super init]) {
-    _source = source;
-  }
-  return self;
-}
-
-@end
-#endif
+#import <RenderCore/CKComponentCoalescingMode.h>

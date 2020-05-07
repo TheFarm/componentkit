@@ -10,11 +10,13 @@
 
 #import <XCTest/XCTest.h>
 
+#import <ComponentKitTestHelpers/CKAnalyticsListenerSpy.h>
 #import <ComponentKitTestHelpers/CKLifecycleTestComponent.h>
 #import <ComponentKitTestHelpers/CKTestRunLoopRunning.h>
 #import <ComponentKitTestHelpers/CKRenderComponentTestHelpers.h>
 
 #import <ComponentKit/CKComponent.h>
+#import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKCompositeComponent.h>
 #import <ComponentKit/CKComponentProvider.h>
 #import <ComponentKit/CKComponentSubclass.h>
@@ -319,7 +321,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto modification =
   [[CKDataSourceChangesetModification alloc]
    initWithChangeset:insertion
-   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault shouldValidateChangeset:NO];
+   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault];
   const auto change = [modification changeFromState:_state];
   const auto isApplied = [dataSource applyChange:change];
   XCTAssertTrue(isApplied, @"Change should be applied to datasource successfully.");
@@ -336,7 +338,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto modification =
   [[CKDataSourceChangesetModification alloc]
    initWithChangeset:insertion
-   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault shouldValidateChangeset:NO];
+   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault];
   const auto change = [modification changeFromState:_state];
   [dataSource reloadWithMode:CKUpdateModeSynchronous userInfo:@{}];
   const auto newState = _state;
@@ -355,7 +357,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto modification =
   [[CKDataSourceChangesetModification alloc]
    initWithChangeset:insertion
-   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault shouldValidateChangeset:NO];
+   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault];
   const auto change = [modification changeFromState:_state];
   const auto isValid = [dataSource verifyChange:change];
   XCTAssertTrue(isValid, @"Change should be valid.");
@@ -371,7 +373,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto modification =
   [[CKDataSourceChangesetModification alloc]
    initWithChangeset:insertion
-   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault shouldValidateChangeset:NO];
+   stateListener:nil userInfo:@{} qos:CKDataSourceQOSDefault];
   const auto change = [modification changeFromState:_state];
   [dataSource reloadWithMode:CKUpdateModeSynchronous userInfo:@{}];
   const auto isValid = [dataSource verifyChange:change];
@@ -432,6 +434,30 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   });
   // `_willGenerateChangeCounter` matches the number of asynchronous changeset applications.
   XCTAssertEqual(_willGenerateChangeCounter, 3);
+}
+
+- (void)test_WhenReceivesStateUpdate_ReportsToAnalyticsListener
+{
+  const auto analyticsListenerSpy = [CKAnalyticsListenerSpy new];
+  const auto dataSource = CKComponentTestDataSource(ComponentProvider, self, analyticsListenerSpy);
+  const auto item = [_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+  const auto handle =
+  [[CKComponentScopeHandle alloc] initWithListener:dataSource
+                                    rootIdentifier:item.scopeRoot.globalIdentifier
+                                 componentTypeName:"CKTestComponent"
+                                      initialState:nil];
+
+  [dataSource componentScopeHandle:handle
+                    rootIdentifier:item.scopeRoot.globalIdentifier
+             didReceiveStateUpdate:^(id x){ return x; }
+                          metadata:{}
+                              mode:CKUpdateModeSynchronous];
+
+  const auto event = analyticsListenerSpy->_events.front();
+  event.match([&](CK::AnalyticsListenerSpy::DidReceiveStateUpdate drsu){
+    XCTAssertEqual(drsu.handle, handle);
+    XCTAssertEqual(drsu.rootID, item.scopeRoot.globalIdentifier);
+  });
 }
 
 #pragma mark - Listener

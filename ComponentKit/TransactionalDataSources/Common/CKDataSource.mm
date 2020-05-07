@@ -11,7 +11,7 @@
 #import "CKDataSource.h"
 #import "CKDataSourceInternal.h"
 
-
+#import <ComponentKit/CKAnalyticsListener.h>
 #import <ComponentKit/CKMutex.h>
 #import <ComponentKit/CKRootTreeNode.h>
 
@@ -267,6 +267,9 @@
 {
   CKAssertMainThread();
 
+  [_state.configuration.analyticsListener didReceiveStateUpdateFromScopeHandle:handle
+                                                                rootIdentifier:rootIdentifier];
+
   if (_pendingAsynchronousStateUpdates.empty() && _pendingSynchronousStateUpdates.empty()) {
     dispatch_async(dispatch_get_main_queue(), ^{
       [self _processStateUpdates];
@@ -507,8 +510,7 @@
     [[CKDataSourceChangesetModification alloc] initWithChangeset:changeset
                                                    stateListener:self
                                                         userInfo:userInfo
-                                                             qos:qos
-                                         shouldValidateChangeset:NO];
+                                                             qos:qos];
   }
 }
 
