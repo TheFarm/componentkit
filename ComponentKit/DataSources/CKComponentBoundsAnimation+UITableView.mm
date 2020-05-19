@@ -1,13 +1,20 @@
-//
-//  CKComponentBoundsAnimation+UITableView.mm
-//  ComponentKit
-//
-//  Created by Fredrik Palm on 2019-08-30.
-//
+/*
+ *  Copyright (c) 2014-present, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 
 #import "CKComponentBoundsAnimation+UITableView.h"
 
+#import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKAvailability.h>
+#import <ComponentKit/CKComponent.h>
+#import <ComponentKit/CKNonNull.h>
+#import <ComponentKit/CKExceptionInfo.h>
 
 #import <vector>
 
@@ -100,11 +107,26 @@ void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const
   if (CGRectIsEmpty(visibleRect)) {
     return;
   }
+
+  NSIndexPath *largestAnimatingVisibleElement = largestAnimatingVisibleElementForOriginalLayout(_indexPathsToOriginalLayoutAttributes, visibleRect);
+  if (largestAnimatingVisibleElement == nil) {
+    CKCWarnWithCategory(NO, animation.component.className, @"largestAnimatingVisibleElement cannot be nil since it will later be passed to [UICollectionView layoutAttributesForItemAtIndexPath:] which expects a non-null pointer.\nOriginal layout attrs by index path: %@\nVisible rect: %@", _indexPathsToOriginalLayoutAttributes, NSStringFromCGRect(visibleRect));
+    return;
+  }
   
+  [self doApplyBoundsAnimationToCollectionView:animation
+                                   visibleRect:visibleRect
+                largestAnimatingVisibleElement:CK::makeNonNull(largestAnimatingVisibleElement)];
+}
+
+- (void)doApplyBoundsAnimationToCollectionView:(const CKComponentBoundsAnimation &)animation
+                                   visibleRect:(CGRect)visibleRect
+                largestAnimatingVisibleElement:(CK::NonNull<NSIndexPath *>)largestAnimatingVisibleElement
+{
   // First, move the cells to their old positions without animation:
   NSMutableDictionary *indexPathsToAnimatingViews = [NSMutableDictionary dictionary];
   NSMutableArray *snapshotViewsToRemoveAfterAnimation = [NSMutableArray array];
-  NSIndexPath *largestAnimatingVisibleElement = largestAnimatingVisibleElementForOriginalLayout(_indexPathsToOriginalLayoutAttributes, visibleRect);
+
   [UIView performWithoutAnimation:^{
     [_indexPathsToOriginalLayoutAttributes enumerateKeysAndObjectsUsingBlock:^(NSIndexPath *indexPath, UITableViewCell *attributes, BOOL *stop) {
       // If we're animating an item *out* of the table view's visible bounds, we can't rely on animating a
@@ -165,13 +187,13 @@ void CKComponentBoundsAnimationApplyAfterTableViewBatchUpdates(id context, const
 // @param tableView The table view the bounds change animation is being applied to.
 // @param visibleRect The visible portion of the table-view's contents.
 // @return The minimum content offset to set on the table-view that will keep the largest visible element still visible.
-static CGPoint contentOffsetAdjustmentToKeepElementInVisibleBounds(NSIndexPath *largestVisibleAnimatingElementIndexPath, NSDictionary *indexPathsToAnimatingViews, UITableView *tableView, CGRect visibleRect)
+static CGPoint contentOffsetAdjustmentToKeepElementInVisibleBounds(CK::NonNull<NSIndexPath *> largestVisibleAnimatingElementIndexPath, NSDictionary *indexPathsToAnimatingViews, UITableView *tableView, CGRect visibleRect)
 {
   CGPoint contentOffsetAdjustment = CGPointZero;
   BOOL largestVisibleElementWillExitVisibleRect = elementWillExitVisibleRect(largestVisibleAnimatingElementIndexPath, indexPathsToAnimatingViews, tableView, visibleRect);
   
   if (largestVisibleElementWillExitVisibleRect) {
-    CGRect currentBounds = ((UIView *)indexPathsToAnimatingViews[largestVisibleAnimatingElementIndexPath]).bounds;
+    CGRect currentBounds = ((UIView *)indexPathsToAnimatingViews[largestVisibleAnimatingElementIndexPath.asNullable()]).bounds;
     CGRect destinationBounds = ((UITableViewCell *) [tableView cellForRowAtIndexPath:largestVisibleAnimatingElementIndexPath]).bounds;
     
     CGFloat deltaX = CGRectGetMaxX(destinationBounds) - CGRectGetMaxX(currentBounds);
@@ -202,7 +224,17 @@ static NSIndexPath* largestAnimatingVisibleElementForOriginalLayout(NSDictionary
 static BOOL elementWillExitVisibleRect(NSIndexPath *indexPath, NSDictionary *indexPathsToAnimatingViews, UITableView *tableView, CGRect visibleRect)
 {
   UIView *animatingView = indexPathsToAnimatingViews[indexPath];
-  UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+  UITableViewCell *cell = nil;
+  
+  @try {
+    cell = [tableView cellForRowAtIndexPath:indexPath];
+  } @catch (NSException *exception) {
+    CKExceptionInfoSetValueForKey(@"ck_index_path", ([NSString stringWithFormat: @"(%ld-%ld)", (long)[indexPath section], (long)[indexPath row]]));
+    CKExceptionInfoSetValueForKey(@"ck_cv_number_of_sections", ([NSString stringWithFormat:@"%ld", (long)[tableView numberOfSections]]));
+    CKExceptionInfoSetValueForKey(@"ck_cv_number_of_items_in_section", ([NSString stringWithFormat:@"%ld", (long)[tableView numberOfItemsInSection:[indexPath section]]]));
+    CKExceptionInfoSetValueForKey(@"ck_cv_visible_rect", NSStringFromCGRect(visibleRect));
+    [exception raise];
+  }
   
   BOOL isItemCurrentlyInVisibleRect = (CGRectIntersectsRect(visibleRect,animatingView.frame));
   BOOL willItemAnimateOffVisibleRect = !CGRectIntersectsRect(visibleRect, cell.frame);

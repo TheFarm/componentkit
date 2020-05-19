@@ -1,30 +1,38 @@
-//
-//  CKTableViewDataSource.m
-//  ComponentKit
-//
-//  Created by Fredrik Palm on 2019-08-30.
-//
+/*
+ *  Copyright (c) 2014-present, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 
 #import "CKTableViewDataSource.h"
 
-#import <ComponentKit/CKDataSource.h>
-#import <ComponentKit/CKDataSourceConfiguration.h>
-#import <ComponentKit/CKDataSourceListener.h>
-#import <ComponentKit/CKDataSourceState.h>
-#import <ComponentKit/CKDataSourceItem.h>
-#import <ComponentKit/CKDataSourceAppliedChanges.h>
-#import <ComponentKit/CKComponentRootView.h>
-#import <ComponentKit/CKComponentLayout.h>
-#import <ComponentKit/CKComponentAttachController.h>
-#import <ComponentKit/CKComponentControllerEvents.h>
-#import <ComponentKit/CKTableViewDataSourceCell.h>
-#import <ComponentKit/CKComponentBoundsAnimation+UITableView.h>
+#import "CKTableViewDataSourceCell.h"
+#import "CKDataSourceConfigurationInternal.h"
+#import "CKDataSourceListener.h"
+#import "CKDataSourceItem.h"
+#import "CKDataSourceState.h"
+#import "CKDataSourceAppliedChanges.h"
+#import "CKDataSourceInternal.h"
+#import "CKTableViewDataSourceInternal.h"
+#import "CKComponentRootViewInternal.h"
+#import "CKComponentLayout.h"
+#import "CKComponentAttachController.h"
+#import "CKComponentBoundsAnimation+UITableView.h"
+#import "CKComponentControllerEvents.h"
+#import "CKTableViewDataSourceListenerAnnouncer.h"
 
 @interface CKTableViewDataSource() <UITableViewDataSource, CKDataSourceListener>
 {
   CKDataSource *_componentDataSource;
+  CKDataSourceState *_currentState;
   CKComponentAttachController *_attachController;
   NSMapTable<UITableViewCell *, CKDataSourceItem *> *_cellToItemMap;
+  CKTableViewDataSourceListenerAnnouncer *_announcer;
+  BOOL _allowTapPassthroughForCells;
 }
 
 @property (nonatomic, strong) CKDataSourceState *currentState;
@@ -53,8 +61,15 @@
     _attachController = [[CKComponentAttachController alloc] init];
     _delegate = delegate;
     _cellToItemMap = [NSMapTable weakToStrongObjectsMapTable];
+    _announcer = [CKTableViewDataSourceListenerAnnouncer new];
   }
   return self;
+}
+
+- (CKDataSourceState *)currentState
+{
+  CKAssertMainThread();
+  return _currentState;
 }
 
 #pragma mark - Changeset application
@@ -63,6 +78,7 @@
                   mode:(CKUpdateMode)mode
               userInfo:(NSDictionary *)userInfo
 {
+  [_componentDataSource setTraitCollection:_tableView.traitCollection];
   [_componentDataSource applyChangeset:changeset
                                   mode:mode
                               userInfo:userInfo];
@@ -81,27 +97,15 @@ static void applyChangesToTableView(UITableView *tableView,
     }
   }];
   
-  [tableView
-   deleteRowsAtIndexPaths:[changes.removedIndexPaths allObjects]
-   withRowAnimation:UITableViewRowAnimationNone];
-  
-  [tableView
-   deleteSections:changes.removedSections
-   withRowAnimation:UITableViewRowAnimationNone];
-  
-  [tableView
-   insertSections:changes.insertedSections
-   withRowAnimation:UITableViewRowAnimationNone];
-  
+  [tableView deleteRowsAtIndexPaths:[changes.removedIndexPaths allObjects] withRowAnimation:UITableViewRowAnimationNone];
+  [tableView deleteSections:changes.removedSections withRowAnimation:UITableViewRowAnimationNone];
   for (NSIndexPath *from in changes.movedIndexPaths) {
     NSIndexPath *to = changes.movedIndexPaths[from];
     [tableView deleteRowsAtIndexPaths:@[from] withRowAnimation:UITableViewRowAnimationNone];
     [tableView insertRowsAtIndexPaths:@[to] withRowAnimation:UITableViewRowAnimationNone];
   }
-  
-  [tableView
-   insertRowsAtIndexPaths:[changes.insertedIndexPaths allObjects]
-   withRowAnimation:UITableViewRowAnimationNone];
+  [tableView insertSections:changes.insertedSections withRowAnimation:UITableViewRowAnimationNone];
+  [tableView insertRowsAtIndexPaths:[changes.insertedIndexPaths allObjects] withRowAnimation:UITableViewRowAnimationNone];
 }
 
 #pragma mark - CKDataSourceListener
@@ -111,7 +115,7 @@ static void applyChangesToTableView(UITableView *tableView,
                   withState:(CKDataSourceState *)state
           byApplyingChanges:(CKDataSourceAppliedChanges *)changes
 {
-  //[_announcer dataSourceWillBeginUpdates:self];
+  [_announcer dataSourceWillBeginUpdates:self];
   const BOOL changesIncludeNonUpdates = (changes.removedIndexPaths.count ||
                                          changes.insertedIndexPaths.count ||
                                          changes.movedIndexPaths.count ||
@@ -132,7 +136,9 @@ static void applyChangesToTableView(UITableView *tableView,
     void (^applyUpdatedState)(CKDataSourceState *) = ^(CKDataSourceState *updatedState) {
       [_tableView performBatchUpdates:^{
         _currentState = updatedState;
-      } completion:nil];
+      } completion:^(BOOL finished) {
+        [_announcer dataSourceDidEndUpdates:self didModifyPreviousState:previousState withState:state byApplyingChanges:changes];
+      }];
     };
     
     // We only apply the bounds animation if we found one with a duration.
@@ -169,7 +175,9 @@ static void applyChangesToTableView(UITableView *tableView,
                                              inState:previousState];
       // Update current state
       _currentState = state;
-    } completion:nil];
+    } completion:^(BOOL finished){
+      [_announcer dataSourceDidEndUpdates:self didModifyPreviousState:previousState withState:state byApplyingChanges:changes];
+    }];
   }
 }
 
@@ -199,9 +207,8 @@ static auto heightChange(CKDataSourceState *previousState, CKDataSourceState *st
 - (void)_detachComponentLayoutForRemovedSections:(NSIndexSet *)removedSections inState:(CKDataSourceState *)state
 {
   [removedSections enumerateIndexesUsingBlock:^(NSUInteger section, BOOL *stop) {
-    [state
-     enumerateObjectsInSectionAtIndex:section
-     usingBlock:^(CKDataSourceItem *item, NSIndexPath *indexPath, BOOL *stop2) {
+    [state enumerateObjectsInSectionAtIndex:section
+                                 usingBlock:^(CKDataSourceItem *item, NSIndexPath *indexPath, BOOL *stop2) {
        [_attachController detachComponentLayoutWithScopeIdentifier:[[item scopeRoot] globalIdentifier]];
      }];
   }];
@@ -242,6 +249,7 @@ static auto heightChange(CKDataSourceState *previousState, CKDataSourceState *st
 - (void)reloadWithMode:(CKUpdateMode)mode
               userInfo:(NSDictionary *)userInfo
 {
+  [_componentDataSource setTraitCollection:_tableView.traitCollection];
   [_componentDataSource reloadWithMode:mode userInfo:userInfo];
 }
 
@@ -249,6 +257,7 @@ static auto heightChange(CKDataSourceState *previousState, CKDataSourceState *st
                        mode:(CKUpdateMode)mode
                    userInfo:(NSDictionary *)userInfo
 {
+  [_componentDataSource setTraitCollection:_tableView.traitCollection];
   [_componentDataSource updateConfiguration:configuration mode:mode userInfo:userInfo];
 }
 
@@ -265,11 +274,13 @@ static auto heightChange(CKDataSourceState *previousState, CKDataSourceState *st
 }
 
 #pragma mark - UITableViewDataSource
+
 static NSString *const kReuseIdentifier = @"com.component_kit.table_view_data_source.cell";
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
   CKTableViewDataSourceCell *cell = [_tableView dequeueReusableCellWithIdentifier:kReuseIdentifier forIndexPath:indexPath];
+  [cell.rootView setAllowTapPassthrough:_allowTapPassthroughForCells];
   attachToCell(cell, [_currentState objectAtIndexPath:indexPath], _attachController, _cellToItemMap);
   [cell.rootView setTransform:tableView.transform];
   return cell;
@@ -291,15 +302,52 @@ static void attachToCell(CKTableViewDataSourceCell *cell,
                          NSMapTable<UITableViewCell *, CKDataSourceItem *> *cellToItemMap,
                          BOOL isUpdate = NO)
 {
-  CKComponentAttachControllerAttachComponentRootLayout(attachController, {
-    .layoutProvider = item,
-    .scopeIdentifier = item.scopeRoot.globalIdentifier,
-    .boundsAnimation = item.boundsAnimation,
-    .view = cell.rootView,
-    .analyticsListener = item.scopeRoot.analyticsListener,
-    .isUpdate = isUpdate
-  });
+  CKComponentAttachControllerAttachComponentRootLayout(
+      attachController,
+      {.layoutProvider = item,
+      .scopeIdentifier = item.scopeRoot.globalIdentifier,
+      .boundsAnimation = item.boundsAnimation,
+      .view = cell.rootView,
+      .analyticsListener = item.scopeRoot.analyticsListener,
+      .isUpdate = isUpdate});
   [cellToItemMap setObject:item forKey:cell];
+}
+
+#pragma mark - Internal
+
+- (void)setAllowTapPassthroughForCells:(BOOL)allowTapPassthroughForCells
+{
+  CKAssertMainThread();
+  _allowTapPassthroughForCells = allowTapPassthroughForCells;
+}
+
+- (void)setState:(CKDataSourceState *)state
+{
+  CKAssertMainThread();
+  if (_currentState == state) {
+    return;
+  }
+  
+  auto const previousState = _currentState;
+  [_announcer dataSource:self willChangeState:previousState];
+  _currentState = state;
+  
+  [_attachController detachAll];
+  [_componentDataSource removeListener:self];
+  _componentDataSource = [[CKDataSource alloc] initWithState:state];
+  [_componentDataSource addListener:self];
+  [_tableView reloadData];
+  [_announcer dataSource:self didChangeState:previousState withState:state];
+}
+
+- (void)addListener:(id<CKTableViewDataSourceListener>)listener
+{
+  [_announcer addListener:listener];
+}
+
+- (void)removeListener:(id<CKTableViewDataSourceListener>)listener
+{
+  [_announcer removeListener:listener];
 }
 
 @end

@@ -1,15 +1,18 @@
-//
-//  CKTableViewDataSourceCell.m
-//  ComponentKit
-//
-//  Created by Fredrik Palm on 2019-08-30.
-//
+/*
+ *  Copyright (c) 2014-present, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 
 #import "CKTableViewDataSourceCell.h"
 
 #import <ComponentKit/CKDelayedNonNull.h>
 
-#import <ComponentKit/CKComponentRootView.h>
+#import "CKComponentRootView.h"
 
 @implementation CKTableViewDataSourceCell {
   CK::DelayedNonNull<CKComponentRootView *> _rootView;
