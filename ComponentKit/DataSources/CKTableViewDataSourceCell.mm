@@ -18,16 +18,60 @@
   CK::DelayedNonNull<CKComponentRootView *> _rootView;
 }
 
-- (instancetype)initWithFrame:(CGRect)frame
+- (instancetype)init
 {
-  if (self = [super initWithFrame:frame]) {
-    // Ideally we could simply cause the cell's existing contentView to be of type CKComponentRootView.
-    // Alas the only way to do this is via private API (_contentViewClass) so we are forced to add a subview.
-    _rootView = CK::makeNonNull([[CKComponentRootView alloc] initWithFrame:CGRectZero]);
-    [[self contentView] addSubview:_rootView];
+  self = [super init];
+  if (self) {
+    [self commonInit];
   }
   return self;
 }
+
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+  self = [super initWithCoder:coder];
+  if (self) {
+    [self commonInit];
+  }
+  return self;
+}
+
+
+- (instancetype)initWithFrame:(CGRect)frame
+{
+  self = [super initWithFrame:frame];
+  if (self) {
+    [self commonInit];
+  }
+  return self;
+}
+
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier
+{
+  if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
+    [self commonInit];
+  }
+  return self;
+}
+
+
+- (void)commonInit
+{
+  // Ideally we could simply cause the cell's existing contentView to be of type CKComponentRootView.
+  // Alas the only way to do this is via private API (_contentViewClass) so we are forced to add a subview.
+  _rootView = CK::makeNonNull([[CKComponentRootView alloc] initWithFrame:CGRectZero]);
+  
+  [[self contentView] addSubview:_rootView];
+  
+  UIColor *clear = [UIColor clearColor];
+  [self setBackgroundColor:clear];
+  [self.contentView setBackgroundColor:clear];
+  [self.backgroundView setBackgroundColor:clear];
+  [_rootView setBackgroundColor:clear];
+}
+
 
 - (CK::NonNull<CKComponentRootView *>)rootView
 {
