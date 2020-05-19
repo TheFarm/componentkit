@@ -32,11 +32,11 @@ public:
   CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                               const CKComponentStateUpdateMap &updates,
                               CKBuildTrigger trigger = CKBuildTrigger::NewTree,
-                              BOOL merge = NO,
                               BOOL enableComponentReuseOptimizations = YES,
                               BOOL shouldCollectTreeNodeCreationInformation = NO,
                               BOOL alwaysBuildRenderTree = NO,
-                              CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone);
+                              CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone,
+                              BOOL enforceCKComponentSubclasses = YES);
   ~CKThreadLocalComponentScope();
 
   /** Returns nullptr if there isn't a current scope */
@@ -64,9 +64,6 @@ public:
   /** Component Allocations */
   NSUInteger componentAllocations;
 
-  /** Avoid duplicate links in the tree nodes for owner/parent based nodes */
-  BOOL mergeTreeNodesLinks;
-
   const CKTreeNodeDirtyIds treeNodeDirtyIds;
 
   const BOOL enableComponentReuseOptimizations;
@@ -74,6 +71,8 @@ public:
   const BOOL shouldCollectTreeNodeCreationInformation;
 
   const CKComponentCoalescingMode coalescingMode;
+
+  const BOOL enforceCKComponentSubclasses;
 
   void push(CKComponentScopePair scopePair, BOOL keysSupportEnabled = NO);
   void push(CKComponentScopePair scopePair, BOOL keysSupportEnabled, BOOL ancestorHasStateUpdate);

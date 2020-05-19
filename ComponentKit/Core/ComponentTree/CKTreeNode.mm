@@ -24,8 +24,36 @@
 #import "CKThreadLocalComponentScope.h"
 #import "CKRenderHelpers.h"
 
+namespace CK {
+namespace TreeNode {
+  id<CKTreeNodeProtocol> nodeForComponent(id<CKComponentProtocol> component)
+  {
+    CKThreadLocalComponentScope *currentScope = CKThreadLocalComponentScope::currentScope();
+    if (currentScope == nullptr) {
+      return nil;
+    }
+
+    // `nodeForComponent` is being called for every non-render component from the base constructor of `CKComponent`.
+    // We can rely on this infomration to increase the `componentAllocations` counter.
+    currentScope->componentAllocations++;
+
+    CKTreeNode *node = currentScope->stack.top().node;
+    if ([node.scopeHandle acquireFromComponent:component]) {
+      return node;
+    }
+    CKCAssertWithCategory([component.class controllerClass] == Nil || [component conformsToProtocol:@protocol(CKRenderComponentProtocol)],
+      NSStringFromClass([component class]),
+      @"Component has a controller but no scope! Make sure you construct your scope(self) "
+      "before constructing the component or CKComponentTestRootScope at the start of the test.");
+
+    return nil;
+  }
+}
+}
+
+
 @interface CKTreeNode ()
-@property (nonatomic, strong, readwrite) id<CKTreeNodeComponentProtocol> component;
+@property (nonatomic, weak, readwrite) id<CKTreeNodeComponentProtocol> component;
 @property (nonatomic, strong, readwrite) CKComponentScopeHandle *scopeHandle;
 @property (nonatomic, assign, readwrite) CKTreeNodeIdentifier nodeIdentifier;
 @end
@@ -51,7 +79,10 @@
                         scopeRoot:(CKComponentScopeRoot *)scopeRoot
                      stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
 {
-  auto const componentKey = [parent createComponentKeyForChildWithTypeName:component.typeName identifier:[component componentIdentifier]];
+  auto const componentKey = [parent createParentKeyForComponentTypeName:component.typeName
+                                                             identifier:[component componentIdentifier]
+                                                                   keys:{}];
+
   auto const previousNode = [previousParent childForComponentKey:componentKey];
 
   // For Render Layout components, the component might have a scope handle already.
@@ -69,9 +100,11 @@
     scopeRoot.rootNode.registerNode(self, parent);
     // Set the link between the tree node and the scope handle.
     [scopeHandle setTreeNode:self];
-#if CK_ASSERTIONS_ENABLED || defined(DEBUG)
+    // Update the treeNode on the component
     [component acquireTreeNode:self];
-#endif
+    // Finalize the node/scope registration.
+    [scopeHandle forceAcquireFromComponent:component];
+    [scopeHandle resolveInScopeRoot:scopeRoot];
   }
   return self;
 }
@@ -81,21 +114,19 @@
        previousParent:(id<CKTreeNodeWithChildrenProtocol> _Nullable)previousParent
                params:(const CKBuildComponentTreeParams &)params
 {
-  if (!params.mergeTreeNodesLinks)
-  {
-    auto const componentKey = [parent createComponentKeyForChildWithTypeName:component.typeName identifier:nil];
-    _componentKey = componentKey;
-  }
+  // The existing `_componentKey` that was created by the scope, is an owner based key;
+  // hence, we extract the `unique identifer` and the `keys` vector from it and recreate a parent based key based on this information.
+  auto const componentKey = [parent createParentKeyForComponentTypeName:component.typeName
+                                                             identifier:std::get<2>(_componentKey)
+                                                                   keys:std::get<3>(_componentKey)];
+  _componentKey = componentKey;
+
   // Set the link between the parent and the child.
   [parent setChild:self forComponentKey:_componentKey];
 
-  // Scoped components already register themselves during the first build phase
-  // when coalesced components are on.
-  if (params.coalescingMode != CKComponentCoalescingModeComposite) {
-    [self registerComponent:component
-                   toParent:parent
-                inScopeRoot:params.scopeRoot];
-  }
+  [self registerComponent:component
+                 toParent:parent
+              inScopeRoot:params.scopeRoot];
 }
 
 - (void)registerComponent:(id<CKTreeNodeComponentProtocol>)component
@@ -103,12 +134,8 @@
               inScopeRoot:(CKComponentScopeRoot *)scopeRoot
 {
   _component = component;
-
   // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
-    scopeRoot.rootNode.registerNode(self, parent);
-  #if CK_ASSERTIONS_ENABLED || defined(DEBUG)
-    [component acquireTreeNode:self];
-  #endif
+  scopeRoot.rootNode.registerNode(self, parent);
 }
 
 - (id)state
@@ -123,7 +150,6 @@
 
 - (void)didReuseWithParent:(id<CKTreeNodeProtocol>)parent
                inScopeRoot:(CKComponentScopeRoot *)scopeRoot
-       traverseAllChildren:(BOOL)traverseAllChildren
 {
   CKAssert(parent != nil, @"The parent cannot be nil; every node should have a valid parent.");
   scopeRoot.rootNode.registerNode(self, parent);

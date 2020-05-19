@@ -38,11 +38,9 @@ namespace CKRenderInternal {
     // Update the previous component.
     prevChildComponent = [(id<CKRenderWithChildComponentProtocol>)previousNode.component child];
     // Update the render node of the component reuse.
-    const auto traverseAllChildren = params.mergeTreeNodesLinks || params.coalescingMode == CKComponentCoalescingModeComposite;
     [node didReuseRenderNode:previousNode
                    scopeRoot:params.scopeRoot
-           previousScopeRoot:params.previousScopeRoot
-         traverseAllChildren:traverseAllChildren];
+           previousScopeRoot:params.previousScopeRoot];
 
     if (childComponent != nullptr) {
       // Link the previous child component to the the new component.
@@ -191,12 +189,20 @@ namespace CKRender {
         return;
       }
 
+      // The assumption was that if there was no previous parent this node couldn't
+      // possibly have a state update. In reality this can happen if the previous generation
+      // didn't contain a render component (thus the second phase wouldn't have been performed
+      // and component aren't linked). A state update on a first generation's non reusable
+      // component introducing a reusable component would lead to an incorrect `parentHasStateUpdate`
+      // value.
+      id previousParentOrComponent = params.previousScopeRoot.hasRenderComponentInTree == NO ? (id)component : previousParent;
+
       // Update the `parentHasStateUpdate` param for Faster state/props updates.
       // TODO: Share this value with the value precomputed in the scope
       parentHasStateUpdate = parentHasStateUpdate ||
       (params.buildTrigger == CKBuildTrigger::StateUpdate &&
        CKRender::componentHasStateUpdate(component.scopeHandle,
-                                         previousParent,
+                                         previousParentOrComponent,
                                          params.buildTrigger,
                                          params.stateUpdates));
 
@@ -313,30 +319,22 @@ namespace CKRender {
                   CKComponentScopeRoot *scopeRoot,
                   const CKComponentStateUpdateMap &stateUpdates) -> CKComponentScopeHandle*
       {
-        CKComponentScopeHandle *scopeHandle;
         // If there is a previous node, we just duplicate the scope handle.
         if (previousNode) {
-          scopeHandle = [previousNode.scopeHandle newHandleWithStateUpdates:stateUpdates];
+          return [previousNode.scopeHandle newHandleWithStateUpdates:stateUpdates];
         } else {
           // The component needs a scope handle in few cases:
           // 1. Has an initial state
           // 2. Returns `YES` from `requiresScopeHandle`
           id initialState = [component initialState];
           if (initialState != CKTreeNodeEmptyState() || component.requiresScopeHandle) {
-            scopeHandle = [[CKComponentScopeHandle alloc] initWithListener:scopeRoot.listener
-                                                            rootIdentifier:scopeRoot.globalIdentifier
-                                                         componentTypeName:component.typeName
-                                                              initialState:initialState];
+            return [[CKComponentScopeHandle alloc] initWithListener:scopeRoot.listener
+                                                     rootIdentifier:scopeRoot.globalIdentifier
+                                                  componentTypeName:component.typeName
+                                                       initialState:initialState];
           }
         }
-
-        // Finalize the node/scope registration.
-        if (scopeHandle) {
-          [component acquireScopeHandle:scopeHandle];
-          [scopeHandle resolveInScopeRoot:scopeRoot];
-        }
-
-        return scopeHandle;
+        return nil;
       }
     }
   }

@@ -65,9 +65,6 @@ struct CKBuildComponentTreeParams {
   // When disabled, all the comopnents will be regenerated (no component reuse optimiztions). Enabled by default.
   BOOL enableComponentReuseOptimizations = YES;
 
-  // Avoid duplicate links in the tree nodes for owner/parent based nodes
-  BOOL mergeTreeNodesLinks = NO;
-
   // The current coalescing mode.
   CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone;
 };
@@ -89,9 +86,6 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 /** Reference to the component's scope handle. */
 @property (nonatomic, strong, readonly, nullable) CKComponentScopeHandle *scopeHandle;
 
-/** Ask the component to acquire a scope handle. */
-- (void)acquireScopeHandle:(CKComponentScopeHandle *)scopeHandle;
-
 /**
  This method translates the component render method into a 'CKTreeNode'; a component tree.
  It's being called by the infra during the component tree creation.
@@ -103,11 +97,6 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 
 #endif
 
-#if CK_ASSERTIONS_ENABLED || defined(DEBUG)
-// These two methods are in DEBUG only in order to save memory.
-// Once we build the component tree (by calling `buildComponentTree:`) by default,
-// we can swap the the scopeHandle ref with the treeNode one.
-
 /** Ask the component to acquire a tree node. */
 - (void)acquireTreeNode:(id<CKTreeNodeProtocol>)treeNode;
 
@@ -116,7 +105,6 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 
 /** Get child at index; can be nil */
 - (id<CKTreeNodeComponentProtocol> _Nullable)childAtIndex:(unsigned int)index;
-#endif
 
 @end
 
@@ -128,7 +116,7 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 
 #if CK_NOT_SWIFT
 
-@property (nonatomic, strong, readonly) id<CKTreeNodeComponentProtocol> component;
+@property (nonatomic, weak, readonly) id<CKTreeNodeComponentProtocol> component;
 
 @property (nonatomic, strong, readonly, nullable) CKComponentScopeHandle *scopeHandle;
 
@@ -144,8 +132,7 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 
 /** This method should be called after a node has been reused */
 - (void)didReuseWithParent:(id<CKTreeNodeProtocol>)parent
-               inScopeRoot:(CKComponentScopeRoot *)scopeRoot
-       traverseAllChildren:(BOOL)traverseAllChildren;
+               inScopeRoot:(CKComponentScopeRoot *)scopeRoot;
 
 /** This method should be called on nodes that have been created from CKComponentScope */
 - (void)linkComponent:(id<CKTreeNodeComponentProtocol>)component
@@ -185,8 +172,9 @@ NS_SWIFT_NAME(TreeNodeComponentProtocol)
 - (id<CKTreeNodeProtocol> _Nullable)childForComponentKey:(const CKTreeNodeComponentKey &)key;
 
 /** Creates a component key for a child node according to its component type name; this method is being called once during the component tree creation */
-- (CKTreeNodeComponentKey)createComponentKeyForChildWithTypeName:(const char *)componentTypeName
-                                                      identifier:(id<NSObject> _Nullable)identifier;
+- (CKTreeNodeComponentKey)createParentKeyForComponentTypeName:(const char *)componentTypeName
+                                                   identifier:(id<NSObject> _Nullable)identifier
+                                                         keys:(const std::vector<id<NSObject>> &)keys;
 
 /** Save a child node in the parent node according to its component key; this method is being called once during the component tree creation */
 - (void)setChild:(id<CKTreeNodeProtocol>)child forComponentKey:(const CKTreeNodeComponentKey &)componentKey;

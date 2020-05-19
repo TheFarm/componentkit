@@ -22,17 +22,11 @@ struct CKGlobalConfig {
   id<CKAnalyticsListener> defaultAnalyticsListener = nil;
   /** If enabled, CKBuildComponent will always build the component tree (CKTreeNode), even if there is no Render component in the tree*/
   BOOL alwaysBuildRenderTree = NO;
-  /** Same as above, but only in DEBUG configuration */
-  BOOL alwaysBuildRenderTreeInDebug = YES;
   /**
    Uses the composite component child size to assign size
    properties on yoga node instead of the size of composite component itself
    */
   BOOL skipCompositeComponentSize = YES;
-  /**
-   Avoid duplicate links in the tree nodes for owner/parent based nodes
-   */
-  BOOL mergeTreeNodesLinks = NO;
   /**
    Use new method of performing optimistic mutations which can last beyond next mount
    */
@@ -41,6 +35,10 @@ struct CKGlobalConfig {
    Component coalescing mode.
    */
    CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone;
+   /**
+    Used for migrating `lastMountedComponent` in `CKComponentController`.
+    */
+   BOOL lastMountedComponentMigrationEnabled = NO;
 };
 
 CKGlobalConfig CKReadGlobalConfig();

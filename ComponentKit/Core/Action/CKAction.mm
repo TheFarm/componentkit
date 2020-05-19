@@ -97,9 +97,8 @@ CKActionBase::CKActionBase(const CKComponentScope &scope, SEL selector) noexcept
   _scopeIdentifierAndResponderGenerator = createScopeIdentifierAndResponderGenerator(handle, selector);
 }
 
-CKActionBase::CKActionBase(SEL selector, id<CKRenderComponentProtocol> component) noexcept : _target(nil), _block(NULL), _variant(CKActionVariant::Responder), _selector(selector)
+CKActionBase::CKActionBase(SEL selector, CKComponentScopeHandle *handle) noexcept : _target(nil), _block(NULL), _variant(CKActionVariant::Responder), _selector(selector)
 {
-  auto const handle = component.scopeHandle;
   CKCAssertNotNil(handle, @"You are creating an action that will not fire because you have an invalid scope handle.");
   _scopeIdentifierAndResponderGenerator = createScopeIdentifierAndResponderGenerator(handle, selector);
 };
@@ -271,7 +270,12 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
         CKComponentActionList *const list = CKGetAssociatedObject_MainThreadAffined(control, ck_actionListKey);
         CKCAssertNotNil(list, @"Unapplicator should always find an action list installed by applicator");
         auto &actionList = list->_actions[controlEvents];
-        actionList.erase(std::find(actionList.begin(), actionList.end(), action));
+        auto it = std::find(actionList.begin(), actionList.end(), action);
+        if (it == actionList.end()) {
+          CKCFailAssert(@"Unapplicator should always find item in action list");
+          return;
+        }
+        actionList.erase(it);
         // Don't bother unsetting the action list or removing the forwarder as a target; both are harmless.
       }
     },

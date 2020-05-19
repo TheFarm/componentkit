@@ -31,17 +31,6 @@ CKComponentScope::~CKComponentScope()
   if (_threadLocalScope != nullptr) {
     [_scopeHandle resolveInScopeRoot:_threadLocalScope->newScopeRoot];
 
-    if (_threadLocalScope->coalescingMode == CKComponentCoalescingModeComposite) {
-      // When coalesced composite components are "on" the component registration needs
-      // to happen during the first build phase in case there is no second build phase.
-      const auto component = _scopeHandle.acquiredComponent;
-      if (component != nil) {
-        [_scopeHandle.treeNode registerComponent:(id<CKTreeNodeComponentProtocol>)component
-                                        toParent:_parentNode
-                                     inScopeRoot:_threadLocalScope->newScopeRoot];
-      }
-    }
-
     if (_threadLocalScope->systraceListener) {
       auto const componentTypeName = _scopeHandle.componentTypeName ?: "UnkownTypeName";
       CKCAssertWithCategory(objc_getClass(componentTypeName) != nil,
@@ -58,8 +47,18 @@ CKComponentScope::~CKComponentScope()
 CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id identifier, id (^initialStateCreator)(void)) noexcept
 {
   CKCAssert(class_isMetaClass(object_getClass(componentClass)), @"Expected %@ to be a meta class", componentClass);
+  CKCWarnWithCategory(
+    [componentClass conformsToProtocol:@protocol(CKReusableComponentProtocol)] == NO,
+    NSStringFromClass(componentClass),
+    @"Reusable components shouldn't use scopes.");
+
   _threadLocalScope = CKThreadLocalComponentScope::currentScope();
   if (_threadLocalScope != nullptr) {
+    CKCWarnWithCategory(
+      [componentClass isSubclassOfClass:[CKComponent class]] == _threadLocalScope->enforceCKComponentSubclasses,
+      NSStringFromClass(componentClass),
+      @"Component type doesn't match the TLS's type. Have you created the component **outside** a component provider function?");
+
     const auto componentTypeName = class_getName(componentClass);
 
     [_threadLocalScope->systraceListener willBuildComponent:componentTypeName];
@@ -75,21 +74,19 @@ CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id 
                                                         keys:_threadLocalScope->keys.top()
                                          initialStateCreator:toInitialStateCreator(initialStateCreator, componentClass)
                                                 stateUpdates:_threadLocalScope->stateUpdates
-                                         mergeTreeNodesLinks:_threadLocalScope->mergeTreeNodesLinks
                                          requiresScopeHandle:YES];
     _scopeHandle = childPair.node.scopeHandle;
 
     const auto ancestorHasStateUpdate =
-        (_threadLocalScope->coalescingMode == CKComponentCoalescingModeComposite &&
+        _threadLocalScope->coalescingMode == CKComponentCoalescingModeComposite &&
          _threadLocalScope->enableComponentReuseOptimizations &&
-         _threadLocalScope->buildTrigger == CKBuildTrigger::StateUpdate)
-        ? (_threadLocalScope->ancestorHasStateUpdate.top() ||
+         _threadLocalScope->buildTrigger == CKBuildTrigger::StateUpdate &&
+        (_threadLocalScope->ancestorHasStateUpdate.top() ||
            CKRender::componentHasStateUpdate(
                childPair.node.scopeHandle,
                pair.previousNode,
                _threadLocalScope->buildTrigger,
-               _threadLocalScope->stateUpdates))
-        : true;
+             _threadLocalScope->stateUpdates));
 
     _threadLocalScope->push({.node = childPair.node, .previousNode = childPair.previousNode}, YES, ancestorHasStateUpdate);
   }

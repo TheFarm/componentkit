@@ -39,11 +39,11 @@ CKThreadLocalComponentScope *CKThreadLocalComponentScope::currentScope() noexcep
 CKThreadLocalComponentScope::CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                                                          const CKComponentStateUpdateMap &updates,
                                                          CKBuildTrigger trigger,
-                                                         BOOL merge,
                                                          BOOL enableComponentReuseOptimizations,
                                                          BOOL shouldCollectTreeNodeCreationInformation,
                                                          BOOL alwaysBuildRenderTree,
-                                                         CKComponentCoalescingMode coalescingMode)
+                                                         CKComponentCoalescingMode coalescingMode,
+                                                         BOOL enforceCKComponentSubclasses)
 : newScopeRoot([previousScopeRoot newRoot]),
   previousScopeRoot(previousScopeRoot),
   stateUpdates(updates),
@@ -51,11 +51,11 @@ CKThreadLocalComponentScope::CKThreadLocalComponentScope(CKComponentScopeRoot *p
   systraceListener(previousScopeRoot.analyticsListener.systraceListener),
   buildTrigger(trigger),
   componentAllocations(0),
-  mergeTreeNodesLinks(merge),
   treeNodeDirtyIds(CKRender::treeNodeDirtyIdsFor(previousScopeRoot, stateUpdates, trigger)),
   enableComponentReuseOptimizations(enableComponentReuseOptimizations),
   shouldCollectTreeNodeCreationInformation(shouldCollectTreeNodeCreationInformation),
   coalescingMode(coalescingMode),
+  enforceCKComponentSubclasses(enforceCKComponentSubclasses),
   previousScope(CKThreadLocalComponentScope::currentScope())
 {
   stack.push({newScopeRoot.rootNode.node(), previousScopeRoot.rootNode.node()});

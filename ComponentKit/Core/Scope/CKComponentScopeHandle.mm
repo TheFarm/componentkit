@@ -39,29 +39,6 @@
   CKScopedResponder *_scopedResponder;
 }
 
-+ (CKComponentScopeHandle *)handleForComponent:(id<CKComponentProtocol>)component
-{
-  CKThreadLocalComponentScope *currentScope = CKThreadLocalComponentScope::currentScope();
-  if (currentScope == nullptr) {
-    return nil;
-  }
-
-  // `handleForComponent` is being called for every non-render component from the base constructor of `CKComponent`.
-  // We can rely on this infomration to increase the `componentAllocations` counter.
-  currentScope->componentAllocations++;
-
-  CKComponentScopeHandle *handle = currentScope->stack.top().node.scopeHandle;
-  if ([handle acquireFromComponent:component]) {
-    return handle;
-  }
-  CKAssertWithCategory([component.class controllerClass] == Nil || [component conformsToProtocol:@protocol(CKRenderComponentProtocol)],
-    NSStringFromClass([component class]),
-    @"Component has a controller but no scope! Make sure you construct your scope(self) "
-    "before constructing the component or CKComponentTestRootScope at the start of the test.");
-
-  return nil;
-}
-
 - (instancetype)initWithListener:(id<CKComponentStateListener>)listener
                   rootIdentifier:(CKComponentScopeRootIdentifier)rootIdentifier
                componentTypeName:(const char *)componentTypeName
@@ -198,19 +175,23 @@
 {
   CKAssertFalse(_resolved);
 
-  // Strong ref
+  // Strong ref: _acquiredComponent may be nil when rendering-to-nil as the
+  // handle won't be acquired.
   const auto acquiredComponent = _acquiredComponent;
-  if (acquiredComponent != nil) {
-    // _acquiredComponent may be nil if a component scope was declared before an early return. In that case, the scope
-    // handle will not be acquired, and we should avoid creating a component controller for the nil component.
-    [scopeRoot registerComponent:acquiredComponent];
-    if (_controller == nil) {
-      _controller = [acquiredComponent buildController];
-    }
-    [scopeRoot registerComponentController:_controller];
+  if (acquiredComponent != nil && _controller == nil) {
+    // Build the controller on the first non nil component.
+    _controller = [acquiredComponent buildController];
   }
 
   _resolved = YES;
+
+  // Register after scope handle resolution so the controller can be accessed
+  // in the predicates.
+  [scopeRoot registerComponent:acquiredComponent];
+
+  // Always register the controller in the scope root if it's present - inc.
+  // when rendering to nil.
+  [scopeRoot registerComponentController:_controller];
 }
 
 - (CKScopedResponder *)scopedResponder

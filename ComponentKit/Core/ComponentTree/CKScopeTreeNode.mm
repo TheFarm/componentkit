@@ -53,8 +53,9 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
   return nil;
 }
 
-- (CKTreeNodeComponentKey)createComponentKeyForChildWithTypeName:(const char *)componentTypeName
-                                                      identifier:(id<NSObject>)identifier
+- (CKTreeNodeComponentKey)createParentKeyForComponentTypeName:(const char *)componentTypeName
+                                                   identifier:(id<NSObject>)identifier
+                                                         keys:(const std::vector<id<NSObject>> &)keys
 {
   // Create **parent** based key counter.
   NSUInteger keyCounter = kTreeNodeParentBaseKey;
@@ -64,7 +65,7 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
       keyCounter += 2;
     }
   }
-  return std::make_tuple(componentTypeName, keyCounter, identifier, std::vector<id<NSObject>>{});
+  return std::make_tuple(componentTypeName, keyCounter, identifier, keys);
 }
 
 - (void)setChild:(id<CKTreeNodeProtocol>)child forComponentKey:(const CKTreeNodeComponentKey &)componentKey
@@ -74,7 +75,6 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
 
 - (void)didReuseWithParent:(id<CKTreeNodeProtocol>)parent
                inScopeRoot:(CKComponentScopeRoot *)scopeRoot
-       traverseAllChildren:(BOOL)traverseAllChildren
 {
   // In case that CKComponentScope was created, but not acquired from the component (for example: early nil return) ,
   // the component was never linked to the scope handle/tree node, hence, we should stop the recursion here.
@@ -82,18 +82,12 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
     return;
   }
 
-  [super didReuseWithParent:parent inScopeRoot:scopeRoot traverseAllChildren:traverseAllChildren];
+  [super didReuseWithParent:parent inScopeRoot:scopeRoot];
 
-  if (traverseAllChildren) {
-    for (auto const &child : _children) {
-      [std::get<1>(child) didReuseWithParent:self inScopeRoot:scopeRoot traverseAllChildren:traverseAllChildren];
-    }
-  } else  {
-    for (auto const &child : _children) {
-      auto childKey = std::get<0>(child);
-      if (std::get<1>(childKey) % 2 == kTreeNodeParentBaseKey) {
-        [std::get<1>(child) didReuseWithParent:self inScopeRoot:scopeRoot traverseAllChildren:traverseAllChildren];
-      }
+  for (auto const &child : _children) {
+    auto childKey = std::get<0>(child);
+    if (std::get<1>(childKey) % 2 == kTreeNodeParentBaseKey) {
+      [std::get<1>(child) didReuseWithParent:self inScopeRoot:scopeRoot];
     }
   }
 }
@@ -131,7 +125,6 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
                                     keys:(const std::vector<id<NSObject>> &)keys
                      initialStateCreator:(id (^)(void))initialStateCreator
                             stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-                     mergeTreeNodesLinks:(BOOL)mergeTreeNodesLinks
                      requiresScopeHandle:(BOOL)requiresScopeHandle
 {
   CKAssertNotNil(pair.node, @"Must have a node");
@@ -151,7 +144,6 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
     childScopeFromPreviousNode:childScopeFromPreviousScope
             initialStateCreator:initialStateCreator
                    stateUpdates:stateUpdates
-            mergeTreeNodesLinks:mergeTreeNodesLinks
             requiresScopeHandle:requiresScopeHandle];
 }
 
@@ -162,7 +154,6 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
               childScopeFromPreviousNode:(CKScopeTreeNode *)childScopeFromPreviousScope
                      initialStateCreator:(id (^)(void))initialStateCreator
                             stateUpdates:(const CKComponentStateUpdateMap &)stateUpdates
-                     mergeTreeNodesLinks:(BOOL)mergeTreeNodesLinks
                      requiresScopeHandle:(BOOL)requiresScopeHandle
 {
   CKAssertNotNil(pair.node, @"Must have a node");
@@ -194,10 +185,7 @@ NSUInteger const kTreeNodeOwnerBaseKey = 1;
   [pair.node setChildScope:newChild forComponentKey:componentKey];
 
   // Update the component key on the new child.
-  if (mergeTreeNodesLinks) {
-    newChild->_componentKey = componentKey;
-  }
-
+  newChild->_componentKey = componentKey;
   return {.node = newChild, .previousNode = childScopeFromPreviousScope};
 }
 
