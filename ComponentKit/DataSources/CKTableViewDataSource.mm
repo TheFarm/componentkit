@@ -28,18 +28,17 @@
 @interface CKTableViewDataSource() <UITableViewDataSource, CKDataSourceListener>
 {
   CKDataSource *_componentDataSource;
+  __weak id<CKTableViewDataSourceDelegate> _delegate;
   CKDataSourceState *_currentState;
   CKComponentAttachController *_attachController;
   NSMapTable<UITableViewCell *, CKDataSourceItem *> *_cellToItemMap;
   CKTableViewDataSourceListenerAnnouncer *_announcer;
   BOOL _allowTapPassthroughForCells;
 }
-
-@property (nonatomic, strong) CKDataSourceState *currentState;
-
 @end
 
 @implementation CKTableViewDataSource
+@synthesize delegate = _delegate;
 
 - (instancetype)initWithTableView:(UITableView *)tableView
                          delegate:(id<CKTableViewDataSourceDelegate>)delegate
@@ -47,16 +46,12 @@
 {
   self = [super init];
   if (self) {
-    _componentDataSource =
-    [[CKDataSource alloc]
-     initWithConfiguration:configuration];
+    _componentDataSource = [[CKDataSource alloc] initWithConfiguration:configuration];
     [_componentDataSource addListener:self];
     
     _tableView = tableView;
     _tableView.dataSource = self;
-    [_tableView
-     registerClass:[CKTableViewDataSourceCell class]
-     forCellReuseIdentifier:kReuseIdentifier];
+    [_tableView registerClass:[CKTableViewDataSourceCell class] forCellReuseIdentifier:kReuseIdentifier];
     
     _attachController = [[CKComponentAttachController alloc] init];
     _delegate = delegate;
@@ -96,7 +91,6 @@ static void applyChangesToTableView(UITableView *tableView,
       attachToCell(cell, [currentState objectAtIndexPath:indexPath], attachController, cellToItemMap, YES);
     }
   }];
-  
   [tableView deleteRowsAtIndexPaths:[changes.removedIndexPaths allObjects] withRowAnimation:UITableViewRowAnimationNone];
   [tableView deleteSections:changes.removedSections withRowAnimation:UITableViewRowAnimationNone];
   for (NSIndexPath *from in changes.movedIndexPaths) {
@@ -142,7 +136,7 @@ static void applyChangesToTableView(UITableView *tableView,
     };
     
     // We only apply the bounds animation if we found one with a duration.
-    // Animating the collection view is an expensive operation and should be
+    // Animating the table view is an expensive operation and should be
     // avoided when possible.
     if (boundsAnimation.duration) {
       id boundsAnimationContext = CKComponentBoundsAnimationPrepareForTableViewBatchUpdates(_tableView, heightChange(previousState, state, changes.updatedIndexPaths));
@@ -351,4 +345,3 @@ static void attachToCell(CKTableViewDataSourceCell *cell,
 }
 
 @end
-
