@@ -87,7 +87,7 @@ static void applyChangesToCollectionView(UICollectionView *collectionView,
 {
   [changes.updatedIndexPaths enumerateObjectsUsingBlock:^(NSIndexPath *indexPath, BOOL *stop) {
     if (CKCollectionViewDataSourceCell *cell = (CKCollectionViewDataSourceCell *) [collectionView cellForItemAtIndexPath:indexPath]) {
-      attachToCell(cell, [currentState objectAtIndexPath:indexPath], attachController, cellToItemMap, YES);
+      attachToCell(cell, [currentState objectAtIndexPath:indexPath], attachController, cellToItemMap);
     }
   }];
   [collectionView deleteItemsAtIndexPaths:[changes.removedIndexPaths allObjects]];
@@ -153,7 +153,7 @@ static void applyChangesToCollectionView(UICollectionView *collectionView,
         CKDataSourceItem *item = [state objectAtIndexPath:indexPath];
         CKCollectionViewDataSourceCell *cell = (CKCollectionViewDataSourceCell *)[_collectionView cellForItemAtIndexPath:indexPath];
         if (cell) {
-          attachToCell(cell, item, _attachController, _cellToItemMap, YES);
+          attachToCell(cell, item, _attachController, _cellToItemMap);
         }
       }
     }, nil);
@@ -295,17 +295,15 @@ static NSString *const kReuseIdentifier = @"com.component_kit.collection_view_da
 static void attachToCell(CKCollectionViewDataSourceCell *cell,
                          CKDataSourceItem *item,
                          CKComponentAttachController *attachController,
-                         NSMapTable<UICollectionViewCell *, CKDataSourceItem *> *cellToItemMap,
-                         BOOL isUpdate = NO)
+                         NSMapTable<UICollectionViewCell *, CKDataSourceItem *> *cellToItemMap)
 {
   CKComponentAttachControllerAttachComponentRootLayout(
       attachController,
       {.layoutProvider = item,
-       .scopeIdentifier = item.scopeRoot.globalIdentifier,
+       .scopeIdentifier = [item.scopeRoot globalIdentifier],
        .boundsAnimation = item.boundsAnimation,
        .view = cell.rootView,
-       .analyticsListener = item.scopeRoot.analyticsListener,
-       .isUpdate = isUpdate});
+       .analyticsListener = [item.scopeRoot analyticsListener]});
   [cellToItemMap setObject:item forKey:cell];
 }
 

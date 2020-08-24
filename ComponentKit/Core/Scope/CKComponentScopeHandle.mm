@@ -171,6 +171,12 @@
   _treeNode = treeNode;
 }
 
+- (void)resolveAndRegisterInScopeRoot:(CKComponentScopeRoot *)scopeRoot
+{
+  [self resolveInScopeRoot:scopeRoot];
+  [self registerInScopeRoot:scopeRoot];
+}
+
 - (void)resolveInScopeRoot:(CKComponentScopeRoot *)scopeRoot
 {
   CKAssertFalse(_resolved);
@@ -184,13 +190,13 @@
   }
 
   _resolved = YES;
+}
 
+- (void)registerInScopeRoot:(CKComponentScopeRoot *)scopeRoot
+{
   // Register after scope handle resolution so the controller can be accessed
   // in the predicates.
-  [scopeRoot registerComponent:acquiredComponent];
-
-  // Always register the controller in the scope root if it's present - inc.
-  // when rendering to nil.
+  [scopeRoot registerComponent:_acquiredComponent];
   [scopeRoot registerComponentController:_controller];
 }
 
@@ -241,7 +247,7 @@
   }
 
   std::lock_guard<std::mutex> l(_mutex);
-  auto result = std::find(_handles.begin(), _handles.end(), handle);
+  auto result = CK::find(_handles, handle);
 
   if (result == _handles.end()) {
     CKFailAssert(@"This scope handle is not associated with this Responder.");

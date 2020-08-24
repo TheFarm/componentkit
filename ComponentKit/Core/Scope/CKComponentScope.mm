@@ -29,7 +29,7 @@ static auto toInitialStateCreator(id (^initialStateCreator)(void), Class compone
 CKComponentScope::~CKComponentScope()
 {
   if (_threadLocalScope != nullptr) {
-    [_scopeHandle resolveInScopeRoot:_threadLocalScope->newScopeRoot];
+    [_scopeHandle resolveAndRegisterInScopeRoot:_threadLocalScope->newScopeRoot];
 
     if (_threadLocalScope->systraceListener) {
       auto const componentTypeName = _scopeHandle.componentTypeName ?: "UnkownTypeName";
@@ -51,6 +51,16 @@ CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id 
     [componentClass conformsToProtocol:@protocol(CKReusableComponentProtocol)] == NO,
     NSStringFromClass(componentClass),
     @"Reusable components shouldn't use scopes.");
+  CKCAssertWithCategory(
+    identifier == nil ||
+    class_isMetaClass(object_getClass(identifier)) ||
+    [identifier conformsToProtocol:@protocol(CKComponentProtocol)] == NO,
+    NSStringFromClass(componentClass),
+    @"Identifier should never be an instance of CKComponent. Identifiers should be **constant**.");
+  CKCAssertWithCategory(
+    identifier != componentClass,
+    NSStringFromClass(componentClass),
+    @"Passing the component class as the identifier is redundant.");
 
   _threadLocalScope = CKThreadLocalComponentScope::currentScope();
   if (_threadLocalScope != nullptr) {
@@ -80,7 +90,7 @@ CKComponentScope::CKComponentScope(Class __unsafe_unretained componentClass, id 
     const auto ancestorHasStateUpdate =
         _threadLocalScope->coalescingMode == CKComponentCoalescingModeComposite &&
          _threadLocalScope->enableComponentReuseOptimizations &&
-         _threadLocalScope->buildTrigger == CKBuildTrigger::StateUpdate &&
+         _threadLocalScope->buildTrigger == CKBuildTriggerStateUpdate &&
         (_threadLocalScope->ancestorHasStateUpdate.top() ||
            CKRender::componentHasStateUpdate(
                childPair.node.scopeHandle,

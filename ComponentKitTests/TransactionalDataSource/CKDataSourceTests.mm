@@ -48,6 +48,7 @@ static NSNumber *const kTestinitialiseControllerModel = @2;
   NSInteger _syncModificationStartCounter;
   CKDataSourceState *_state;
   void(^_didModifyPreviousStateBlock)(void);
+  UITraitCollection *_currentTraitCollection;
 }
 
 static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
@@ -254,7 +255,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   [dataSource updateConfiguration:[_state.configuration copyWithContext:kTestInitialiseControllerContext sizeRange:{}]
                              mode:CKUpdateModeSynchronous
                          userInfo:@{}];
-  const auto secondController = (CKLifecycleTestComponentController *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
+  const auto secondController = (CKLifecycleTestComponentController *)((CKComponent *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child).controller;
   XCTAssertNotEqual(firstController, secondController);
   XCTAssertTrue(firstController.calledInvalidateController);
   XCTAssertTrue(secondController.calledDidInit);
@@ -271,7 +272,7 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
                               build]
                         mode:CKUpdateModeSynchronous
                     userInfo:@{}];
-  const auto secondController = (CKLifecycleTestComponentController *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child.controller;
+  const auto secondController = (CKLifecycleTestComponentController *)((CKComponent *)((CKCompositeComponent *)[[_state objectAtIndexPath:firstIndexPath] rootLayout].component()).child).controller;
   XCTAssertNotEqual(firstController, secondController);
   XCTAssertTrue(firstController.calledInvalidateController);
   XCTAssertTrue(secondController.calledDidInit);
@@ -443,12 +444,12 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto item = [_state objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
   const auto handle =
   [[CKComponentScopeHandle alloc] initWithListener:dataSource
-                                    rootIdentifier:item.scopeRoot.globalIdentifier
+                                    rootIdentifier:[item.scopeRoot globalIdentifier]
                                  componentTypeName:"CKTestComponent"
                                       initialState:nil];
 
   [dataSource componentScopeHandle:handle
-                    rootIdentifier:item.scopeRoot.globalIdentifier
+                    rootIdentifier:[item.scopeRoot globalIdentifier]
              didReceiveStateUpdate:^(id x){ return x; }
                           metadata:{}
                               mode:CKUpdateModeSynchronous];
@@ -456,8 +457,24 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
   const auto event = analyticsListenerSpy->_events.front();
   event.match([&](CK::AnalyticsListenerSpy::DidReceiveStateUpdate drsu){
     XCTAssertEqual(drsu.handle, handle);
-    XCTAssertEqual(drsu.rootID, item.scopeRoot.globalIdentifier);
+    XCTAssertEqual(drsu.rootID, [item.scopeRoot globalIdentifier]);
   });
+}
+
+- (void)test_WhenTraitCollectionIsSet_CurrentTraitCollectionIsCorrectInWorkQueue
+{
+  if (@available(iOS 13.0, tvOS 13.0, *)) {
+    const auto dataSource = CKComponentTestDataSource(ComponentProvider, self);
+    [dataSource setTraitCollection:[UITraitCollection traitCollectionWithUserInterfaceIdiom:UIUserInterfaceIdiomCarPlay]];
+    [dataSource
+     applyChangeset:[[CKDataSourceChangesetBuilder dataSourceChangeset] build]
+     mode:CKUpdateModeAsynchronous
+     userInfo:@{}];
+    CKRunRunLoopUntilBlockIsTrue(^BOOL{
+      return _didGenerateChangeCounter == 1;
+    });
+    XCTAssertEqual(_currentTraitCollection.userInterfaceIdiom, UIUserInterfaceIdiomCarPlay);
+  }
 }
 
 #pragma mark - Listener
@@ -482,6 +499,9 @@ static CKComponent *ComponentProvider(id<NSObject> model, id<NSObject> context)
 - (void)dataSource:(CKDataSource *)dataSource willGenerateNewStateWithUserInfo:(NSDictionary *)userInfo
 {
   _willGenerateChangeCounter++;
+  if (@available(iOS 13.0, tvOS 13.0, *)) {
+    _currentTraitCollection = [UITraitCollection currentTraitCollection];
+  }
 }
 
 - (void)dataSource:(CKDataSource *)dataSource didGenerateNewState:(CKDataSourceState *)newState changes:(CKDataSourceAppliedChanges *)changes

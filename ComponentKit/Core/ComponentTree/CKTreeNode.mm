@@ -104,7 +104,7 @@ namespace TreeNode {
     [component acquireTreeNode:self];
     // Finalize the node/scope registration.
     [scopeHandle forceAcquireFromComponent:component];
-    [scopeHandle resolveInScopeRoot:scopeRoot];
+    [scopeHandle resolveAndRegisterInScopeRoot:scopeRoot];
   }
   return self;
 }
@@ -124,18 +124,9 @@ namespace TreeNode {
   // Set the link between the parent and the child.
   [parent setChild:self forComponentKey:_componentKey];
 
-  [self registerComponent:component
-                 toParent:parent
-              inScopeRoot:params.scopeRoot];
-}
-
-- (void)registerComponent:(id<CKTreeNodeComponentProtocol>)component
-                 toParent:(id<CKTreeNodeWithChildrenProtocol>)parent
-              inScopeRoot:(CKComponentScopeRoot *)scopeRoot
-{
   _component = component;
   // Register the node-parent link in the scope root (we use it to mark dirty branch on a state update).
-  scopeRoot.rootNode.registerNode(self, parent);
+  params.scopeRoot.rootNode.registerNode(self, parent);
 }
 
 - (id)state

@@ -81,7 +81,7 @@
     .previousScopeRoot = _scopeRoot,
     .stateUpdates = {},
     .treeNodeDirtyIds = {100, 101}, // Use a random id that represents a fake state update on a different branch.
-    .buildTrigger = CKBuildTrigger::StateUpdate,
+    .buildTrigger = CKBuildTriggerStateUpdate,
   });
 
   // As the state update doesn't affect the c2, we should reuse c instead.
@@ -147,7 +147,7 @@
     .treeNodeDirtyIds = {
       _c.scopeHandle.treeNodeIdentifier
     },
-    .buildTrigger = CKBuildTrigger::StateUpdate,
+    .buildTrigger = CKBuildTriggerStateUpdate,
   });
 
   // As the state update affect c2, we should recreate its children.
@@ -179,7 +179,7 @@
     .treeNodeDirtyIds = {
       _c.scopeHandle.treeNodeIdentifier
     },
-    .buildTrigger = CKBuildTrigger::StateUpdate,
+    .buildTrigger = CKBuildTriggerStateUpdate,
   });
 
   // As the state update affect c2, we should recreate its children.
@@ -206,7 +206,7 @@
     .previousScopeRoot = _scopeRoot,
     .stateUpdates = {},
     .treeNodeDirtyIds = {},
-    .buildTrigger = CKBuildTrigger::PropsUpdate,
+    .buildTrigger = CKBuildTriggerPropsUpdate,
   });
 
   // Props are not equal, we cannot reuse the component in this case.
@@ -234,7 +234,7 @@
     .previousScopeRoot = _scopeRoot,
     .stateUpdates = {},
     .treeNodeDirtyIds = {},
-    .buildTrigger = CKBuildTrigger::PropsUpdate,
+    .buildTrigger = CKBuildTriggerPropsUpdate,
   });
 
   // The components are equal, we can reuse the previous component.
@@ -299,7 +299,7 @@
     .previousScopeRoot = _scopeRoot,
     .stateUpdates = {},
     .treeNodeDirtyIds = {},
-    .buildTrigger = CKBuildTrigger::StateUpdate,
+    .buildTrigger = CKBuildTriggerStateUpdate,
   });
 
   // c is not dirty, the components are equal, so we reuse the previous component.
@@ -329,11 +329,97 @@
     return c2;
   };
 
-  auto const buildResults = CKBuildComponent(_scopeRoot, {}, componentFactory, YES);
+  auto const buildResults = CKBuildComponent(CK::makeNonNull(_scopeRoot), {}, componentFactory, YES);
 
   // The components are equal, but the node id is dirty - hence, we cannot reuse the previous component.
   [self verifyComponentIsNotBeingReused:_c c2:c2 scopeRoot:_scopeRoot scopeRoot2:buildResults.scopeRoot];
 
+}
+
+#pragma mark - Props and State Update
+
+- (void)test_fasterStateUpdate_componentIsNotBeingReused_onPropsAndStateUpdate
+{
+  __block CKCompositeComponentWithScopeAndState *root;
+  __block CKTestRenderComponent *c;
+  auto const componentIdentifier = 1;
+  auto const componentFactory = ^{
+    c = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
+    root = [CKCompositeComponentWithScopeAndState newWithComponent:c];
+    return root;
+  };
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
+
+  // Simulate props and a state update on a component
+  // 1. parentHasStateUpdate = YES
+  // 2. treeNodeDirtyIds with a fake parent id.
+  // 3. forcePropsUpdates = YES
+  // 4. Props (componentIdentifier) are equal = reuse
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[root.scopeHandle].push_back(^(id){
+    return @2;
+  });
+
+  __block CKCompositeComponentWithScopeAndState *root2;
+  __block CKTestRenderComponent *c2;
+  auto const componentFactory2 = ^{
+    c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
+    root2 = [CKCompositeComponentWithScopeAndState newWithComponent:c2];
+    return root2;
+  };
+
+  auto const forcePropsUpdates = YES;
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES, forcePropsUpdates);
+
+  // forcePropsUpdates + state update should end up with PropsAndStateUpdate trigger - which behaves the same as PropsUpdates
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 0);
+  XCTAssertFalse(c.didReuseComponent);
+  XCTAssertTrue(c2.didReuseComponent);
+  XCTAssertEqual(c.childComponent, c2.childComponent);
+}
+
+- (void)test_fasterStateUpdate_componentIsBeingReused_onPropsAndStateUpdate
+{
+  __block CKCompositeComponentWithScopeAndState *root;
+  __block CKTestRenderComponent *c;
+  auto const componentIdentifier = 1;
+  auto const componentFactory = ^{
+    c = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier}];
+    root = [CKCompositeComponentWithScopeAndState newWithComponent:c];
+    return root;
+  };
+  auto const buildResults = CKBuildComponent(CKComponentScopeRootWithDefaultPredicates(nil, nil), {}, componentFactory, YES);
+
+  // Simulate props and a state update on a component
+  // 1. parentHasStateUpdate = YES
+  // 2. treeNodeDirtyIds with a fake parent id.
+  // 3. forcePropsUpdates = YES
+  // 4. Props (componentIdentifier) are different = no reuse
+  CKComponentStateUpdateMap stateUpdates;
+  stateUpdates[root.scopeHandle].push_back(^(id){
+    return @2;
+  });
+
+  __block CKCompositeComponentWithScopeAndState *root2;
+  __block CKTestRenderComponent *c2;
+  // Simulate props update
+  auto const componentIdentifier2 = 2;
+  auto const componentFactory2 = ^{
+    c2 = [CKTestRenderComponent newWithProps:{.identifier = componentIdentifier2}];
+    root2 = [CKCompositeComponentWithScopeAndState newWithComponent:c2];
+    return root2;
+  };
+
+  auto const forcePropsUpdates = YES;
+  auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES, forcePropsUpdates);
+
+  // forcePropsUpdates + state update should end up with PropsAndStateUpdate trigger - which behaves the same as PropsUpdates
+  XCTAssertEqual(c.renderCalledCounter, 1);
+  XCTAssertEqual(c2.renderCalledCounter, 1);
+  XCTAssertFalse(c.didReuseComponent);
+  XCTAssertFalse(c2.didReuseComponent);
+  XCTAssertNotEqual(c.childComponent, c2.childComponent);
 }
 
 #pragma mark - parentHasStateUpdate
@@ -431,7 +517,7 @@
   [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults.scopeRoot
                                                     components:{
     c1, c1.childComponent,
-    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.child,
+    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.childComponent,
   }
                                             componentPredicate:&CKAllNonNilComponentsTestsPredicate
                                   componentControllerPredicate:&CKAllNonNilComponentsControllersTestsPredicate];
@@ -450,7 +536,7 @@
   [self verifyComponentsAndControllersAreRegisteredInScopeRoot:buildResults2.scopeRoot
                                                     components:{
     c1, c1.childComponent,
-    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.child,
+    c2, c2.nonRenderChildComponent, c2.nonRenderChildComponent.childComponent,
   }
                                             componentPredicate:&CKAllNonNilComponentsTestsPredicate
                                   componentControllerPredicate:&CKAllNonNilComponentsControllersTestsPredicate];
@@ -734,7 +820,7 @@ static CKCompositeComponentWithScopeAndState* generateComponentHierarchyWithComp
   id<CKTreeNodeComponentProtocol> component = c1.childComponent;
   while (component) {
     [componentsFromParentNodeMap addObject:component];
-    auto const parent = buildResults2.scopeRoot.rootNode.parentForNodeIdentifier(component.scopeHandle.treeNode.nodeIdentifier);
+    auto const parent = [buildResults2.scopeRoot rootNode].parentForNodeIdentifier(component.scopeHandle.treeNode.nodeIdentifier);
     component = parent.component;
   }
 
@@ -742,7 +828,7 @@ static CKCompositeComponentWithScopeAndState* generateComponentHierarchyWithComp
   id<CKTreeNodeComponentProtocol> component2 = c2.childComponent;
   while (component2) {
     [componentsFromParentNodeMap addObject:component2];
-    auto const parent = buildResults2.scopeRoot.rootNode.parentForNodeIdentifier(component2.scopeHandle.treeNode.nodeIdentifier);
+    auto const parent = [buildResults2.scopeRoot rootNode].parentForNodeIdentifier(component2.scopeHandle.treeNode.nodeIdentifier);
     component2 = parent.component;
   }
 
@@ -789,13 +875,13 @@ static CKCompositeComponentWithScopeAndState* generateComponentHierarchyWithComp
   // Simulate state update on c1.child.childComponent
   NSNumber *newState1 = @10;
   CKComponentStateUpdateMap stateUpdates;
-  auto c1Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c1.child;
+  auto c1Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c1.childComponent;
   stateUpdates[c1Child.childComponent.scopeHandle].push_back(^(id){ return newState1; });
   auto const buildResults2 = CKBuildComponent(buildResults.scopeRoot, stateUpdates, componentFactory2, YES);
 
   // Accessing the updated children
-  c1Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c1.child;
-  auto c2Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c2.child;
+  c1Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c1.childComponent;
+  auto c2Child = (CKTestRenderWithNonRenderWithStateChildComponent *)c2.childComponent;
 
   // Verify `c2.child.childComponent` gets the correct new state
   XCTAssertEqual(newState1, c1Child.childComponent.scopeHandle.state);

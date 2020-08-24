@@ -17,6 +17,7 @@
 #import <ComponentKit/CKInternalHelpers.h>
 #import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKAssociatedObject.h>
+#import <ComponentKit/CKCollection.h>
 #import <ComponentKit/CKMutex.h>
 
 #import "CKComponent+UIView.h"
@@ -26,29 +27,6 @@
 void CKActionTypeVectorBuild(std::vector<const char *> &typeVector, const CKActionTypelist<> &list) noexcept { }
 void CKConfigureInvocationWithArguments(NSInvocation *invocation, NSInteger index) noexcept { }
 
-static auto createScopeIdentifierAndResponderGenerator(CKComponentScopeHandle *handle,
-                                                       SEL selector) ->
-std::pair<CKScopedResponderUniqueIdentifier, CKResponderGenerationBlock>
-{
-  const auto scopedResponder = handle.scopedResponder;
-  const auto responderKey = [scopedResponder keyForHandle:handle];
-  return {
-    [handle globalIdentifier],
-    ^id(void) {
-
-      /**
-       At one point in the history of ComponentKit, it was possible for a CKScopeResponder to
-       return a "stale" target for an action. This was often caused by retain cycles, or,
-       "old" component hierarchies with prolonged lifecycles.
-
-       To prevent this from happening in the future we now provide a key which gives the
-       scopeResponder the wisdom to ignore older generations.
-       */
-      return [scopedResponder responderForKey:responderKey];
-    }
-  };
-}
-
 #pragma mark - CKActionBase
 
 bool CKActionBase::operator==(const CKActionBase& rhs) const
@@ -56,9 +34,8 @@ bool CKActionBase::operator==(const CKActionBase& rhs) const
   return (_variant == rhs._variant
           && CKObjectIsEqual(_target, rhs._target)
           // If we are using a scoped action, we are only concerned that the selector and the
-          // scoped responder match. Since the scoped responder is abstracted away to the block
-          // within in the pair, we provide a identifier to quickly verify the scoped responders are the same.
-          && _scopeIdentifierAndResponderGenerator.first == rhs._scopeIdentifierAndResponderGenerator.first
+          // responder unique identifier matches.
+          && _scopedResponderAndKey.responder.uniqueIdentifier == rhs._scopedResponderAndKey.responder.uniqueIdentifier
           && _selector == rhs._selector
           && _block == rhs._block);
 }
@@ -68,7 +45,7 @@ CKActionSendBehavior CKActionBase::defaultBehavior() const
   return (_variant == CKActionVariant::RawSelector
           ? CKActionSendBehaviorStartAtSenderNextResponder
           : CKActionSendBehaviorStartAtSender);
-};
+}
 
 id CKActionBase::initialTarget(CKComponent *sender) const
 {
@@ -78,38 +55,66 @@ id CKActionBase::initialTarget(CKComponent *sender) const
     case CKActionVariant::TargetSelector:
       return _target;
     case CKActionVariant::Responder:
-      return _scopeIdentifierAndResponderGenerator.second ? _scopeIdentifierAndResponderGenerator.second() : nil;
+      return [_scopedResponderAndKey.responder responderForKey:_scopedResponderAndKey.key];
     case CKActionVariant::Block:
       CKCFailAssert(@"Should not be asking for target for block action.");
       return nil;
   }
 }
 
-CKActionBase::CKActionBase() noexcept : _target(nil), _scopeIdentifierAndResponderGenerator({}), _block(NULL), _variant(CKActionVariant::RawSelector), _selector(nullptr) {}
+CKActionBase::CKActionBase() noexcept
+  : _target(nil),
+    _scopedResponderAndKey({}),
+    _block(NULL),
+    _variant(CKActionVariant::RawSelector),
+    _selector(nullptr) {}
 
-CKActionBase::CKActionBase(id target, SEL selector) noexcept : _target(target), _scopeIdentifierAndResponderGenerator({}), _block(NULL), _variant(CKActionVariant::TargetSelector), _selector(selector) {};
+CKActionBase::CKActionBase(const CKActionBase&) = default;
 
+CKActionBase::CKActionBase(id target, SEL selector) noexcept
+  : _target(target),
+    _scopedResponderAndKey({}),
+    _block(NULL),
+    _variant(CKActionVariant::TargetSelector),
+    _selector(selector) {}
 
-CKActionBase::CKActionBase(const CKComponentScope &scope, SEL selector) noexcept : _target(nil), _block(NULL), _variant(CKActionVariant::Responder), _selector(selector)
+CKActionBase::CKActionBase(const CKComponentScope &scope, SEL selector) noexcept
+  : CKActionBase(selector, scope.scopeHandle()) { }
+
+CKActionBase::CKActionBase(SEL selector, CKComponentScopeHandle *handle) noexcept
+  : _target(nil),
+    _scopedResponderAndKey{ .responder = handle.scopedResponder, .key = [handle.scopedResponder keyForHandle:handle] },
+    _block(NULL),
+
+    _variant(CKActionVariant::Responder),
+    _selector(selector)
 {
-  const auto handle = scope.scopeHandle();
   CKCAssertNotNil(handle, @"You are creating an action that will not fire because you have an invalid scope handle.");
-  _scopeIdentifierAndResponderGenerator = createScopeIdentifierAndResponderGenerator(handle, selector);
 }
 
-CKActionBase::CKActionBase(SEL selector, CKComponentScopeHandle *handle) noexcept : _target(nil), _block(NULL), _variant(CKActionVariant::Responder), _selector(selector)
-{
-  CKCAssertNotNil(handle, @"You are creating an action that will not fire because you have an invalid scope handle.");
-  _scopeIdentifierAndResponderGenerator = createScopeIdentifierAndResponderGenerator(handle, selector);
-};
+CKActionBase::CKActionBase(SEL selector) noexcept
+  : _target(nil),
+    _scopedResponderAndKey({}),
+    _block(NULL),
+    _variant(CKActionVariant::RawSelector),
+    _selector(selector) {}
 
-CKActionBase::CKActionBase(SEL selector) noexcept : _target(nil), _scopeIdentifierAndResponderGenerator({}), _block(NULL), _variant(CKActionVariant::RawSelector), _selector(selector) {};
+CKActionBase::CKActionBase(dispatch_block_t block) noexcept
+  : _target(nil),
+    _scopedResponderAndKey({}),
+    _block(block),
+    _variant(CKActionVariant::Block),
+    _selector(NULL) {}
 
-CKActionBase::CKActionBase(dispatch_block_t block) noexcept : _target(nil), _scopeIdentifierAndResponderGenerator({}), _block(block), _variant(CKActionVariant::Block), _selector(NULL) {};
+CKActionBase::operator bool() const noexcept {
+  return _selector != NULL || _block != NULL || _scopedResponderAndKey.responder != nil;
+}
 
-CKActionBase::operator bool() const noexcept { return _selector != NULL || _block != NULL || _scopeIdentifierAndResponderGenerator.second != nil; };
+CKActionBase::~CKActionBase() {}
 
-SEL CKActionBase::selector() const noexcept { return _selector; };
+SEL CKActionBase::selector() const noexcept {
+  return _selector;
+}
 
 std::string CKActionBase::identifier() const noexcept
 {
@@ -119,23 +124,25 @@ std::string CKActionBase::identifier() const noexcept
     case CKActionVariant::TargetSelector:
       return std::string(sel_getName(_selector)) + "-TargetSelector-" + std::to_string((long)_target);
     case CKActionVariant::Responder:
-      return std::string(sel_getName(_selector)) + "-Responder-" + std::to_string(_scopeIdentifierAndResponderGenerator.first);
+      return std::string(sel_getName(_selector)) + "-Responder-" + std::to_string(_scopedResponderAndKey.responder.uniqueIdentifier);
     case CKActionVariant::Block:
       return std::string(sel_getName(_selector)) + "-Block-" + std::to_string((long)_block);
   }
 }
 
-dispatch_block_t CKActionBase::block() const noexcept { return _block; };
+dispatch_block_t CKActionBase::block() const noexcept {
+  return _block;
+}
 
-CKComponentScopeHandle *CKActionBase::scopeHandleFromContext(const CK::BaseRenderContext &context) {
+CKComponentScopeHandle *CKActionBase::scopeHandleFromContext(const CK::BaseSpecContext &context) {
   // Requires CKComponentInternal.h which shouldn't be imported publicly.
   return componentFromContext(context).scopeHandle;
 }
 
-CKComponent *CKActionBase::componentFromContext(const CK::BaseRenderContext &context) {
+CKComponent *CKActionBase::componentFromContext(const CK::BaseSpecContext &context) {
   const auto component = context._component;
 #if DEBUG
-    CKCAssertNotNil(component, @"BaseRenderContext contains nil component");
+    CKCAssertNotNil(component, @"BaseSpecContext contains nil component");
     CKCAssert([component conformsToProtocol:@protocol(CKTreeNodeComponentProtocol)], @"RenderContext contains non tree node component");
 #endif
   return ((CKComponent *)component);
@@ -270,7 +277,7 @@ CKComponentViewAttributeValue CKComponentActionAttribute(const CKAction<UIEvent 
         CKComponentActionList *const list = CKGetAssociatedObject_MainThreadAffined(control, ck_actionListKey);
         CKCAssertNotNil(list, @"Unapplicator should always find an action list installed by applicator");
         auto &actionList = list->_actions[controlEvents];
-        auto it = std::find(actionList.begin(), actionList.end(), action);
+        auto it = CK::find(actionList, action);
         if (it == actionList.end()) {
           CKCFailAssert(@"Unapplicator should always find item in action list");
           return;
@@ -489,7 +496,7 @@ NSString *_CKComponentResponderChainDebugResponderChain(id responder) noexcept {
 
 @implementation CKComponentAccessibilityCustomAction
 {
-  UIView *_ck_view;
+  __weak UIView *_ck_view;
   CKAction<> _ck_action;
 }
 

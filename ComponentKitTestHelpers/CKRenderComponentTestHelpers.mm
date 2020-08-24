@@ -115,7 +115,7 @@
   _parentHasStateUpdate = parentHasStateUpdate;
 }
 
-- (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
+- (CKLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
                           restrictedToSize:(const CKComponentSize &)size
                       relativeToParentSize:(CGSize)parentSize
 {
@@ -144,7 +144,7 @@
   return @1;
 }
 
-- (CKComponent *)child
+- (CKComponent *)childComponent
 {
   return _child;
 }
@@ -220,7 +220,7 @@
   return c;
 }
 
-- (CKComponent *)child
+- (CKComponent *)childComponent
 {
   return _child;
 }

@@ -16,9 +16,10 @@
 #import <ComponentKit/CKComponentProvider.h>
 #import <ComponentKit/CKDataSourceConfigurationInternal.h>
 #import <ComponentKit/CKDataSourceItemInternal.h>
+#import <ComponentKit/CKExceptionInfoScopedValue.h>
 #import <ComponentKit/CKMountable.h>
 
-CKDataSourceItem *CKBuildDataSourceItem(CKComponentScopeRoot *previousRoot,
+CKDataSourceItem *CKBuildDataSourceItem(CK::NonNull<CKComponentScopeRoot *> previousRoot,
                                         const CKComponentStateUpdateMap &stateUpdates,
                                         const CKSizeRange &sizeRange,
                                         CKDataSourceConfiguration *configuration,
@@ -26,6 +27,9 @@ CKDataSourceItem *CKBuildDataSourceItem(CKComponentScopeRoot *previousRoot,
                                         id context,
                                         BOOL enableComponentReuseOptimizations)
 {
+  CKExceptionInfoScopedValue modelValue{@"ck_data_source_item_model", NSStringFromClass([model class]) ?: @"Nil"};
+  CKExceptionInfoScopedValue contextValue{@"ck_data_source_item_context", NSStringFromClass([context class]) ?: @"Nil"};
+
   auto const componentProvider = [configuration componentProvider];
   const auto componentFactory = ^{
     return componentProvider(model, context);
@@ -36,7 +40,7 @@ CKDataSourceItem *CKBuildDataSourceItem(CKComponentScopeRoot *previousRoot,
                                                          enableComponentReuseOptimizations);
   const auto rootLayout = CKComputeRootComponentLayout(result.component,
                                                        sizeRange,
-                                                       result.scopeRoot.analyticsListener,
+                                                       [result.scopeRoot analyticsListener],
                                                        result.buildTrigger,
                                                        result.scopeRoot);
   return [[CKDataSourceItem alloc] initWithRootLayout:rootLayout

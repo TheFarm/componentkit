@@ -14,7 +14,9 @@
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKMacros.h>
 #import <ComponentKit/CKInternalHelpers.h>
+#import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKFunctionalHelpers.h>
+#import <ComponentKit/CKWritingDirection.h>
 #import <ComponentKit/CKSizeAssert.h>
 
 #import "yoga/Yoga.h"
@@ -25,6 +27,7 @@
 #import "CKComponentLayoutBaseline.h"
 #import "CKComponentSubclass.h"
 #import "CKCompositeComponent.h"
+#import "CKThreadLocalComponentScope.h"
 
 const struct CKStackComponentLayoutExtraKeys CKStackComponentLayoutExtraKeys = {
   .hadOverflow = @"hadOverflow"
@@ -36,7 +39,7 @@ const struct CKStackComponentLayoutExtraKeys CKStackComponentLayoutExtraKeys = {
 @interface CKFlexboxChildCachedLayout : NSObject
 
 @property (nonatomic) CKComponent *component;
-@property (nonatomic) CKComponentLayout componentLayout;
+@property (nonatomic) CKLayout componentLayout;
 @property (nonatomic) float width;
 @property (nonatomic) float height;
 @property (nonatomic) YGMeasureMode widthMode;
@@ -55,7 +58,43 @@ template class std::vector<CKFlexboxComponentChild>;
 @implementation CKFlexboxComponent {
   CKFlexboxComponentStyle _style;
   std::vector<CKFlexboxComponentChild> _children;
+
+#if CK_ASSERTIONS_ENABLED
+  // @cuva - Attempting to debug a memory related issue - see below comments for more details.
+  // https://fburl.com/tasks/oahenjua
+  std::size_t _barrier;
+  std::vector<CKFlexboxComponentChild> _childrenCopy;
+  std::size_t _childrenSize;
+  NSArray<NSString *> *_description;
+#endif
 }
+
+#if CK_ASSERTIONS_ENABLED
+static NSArray<NSString *> *_makeDescription(const std::vector<CKFlexboxComponentChild>& children) {
+  NSMutableArray<NSString *> *const items = [NSMutableArray new];
+  if (const auto tls = CKThreadLocalComponentScope::currentScope()) {
+    auto stack = tls->stack;
+    while (stack.empty() == false) {
+      const auto top = stack.top();
+      stack.pop();
+      if (top.node.scopeHandle != nil) {
+        [items addObject:@(top.node.scopeHandle.componentTypeName)];
+      }
+    }
+  }
+
+  [items addObject:@"----- Children -------"];
+
+  for (const auto& child : children) {
+    if (child.component.className != nil) {
+      [items addObject:child.component.className];
+    }
+  }
+
+  return items;
+}
+
+#endif
 
 + (instancetype)newWithView:(const CKComponentViewConfiguration &)view
                        size:(const CKComponentSize &)size
@@ -67,14 +106,53 @@ template class std::vector<CKFlexboxComponentChild>;
   if (component) {
     component->_style = style;
     component->_children = children.take();
+
+#if CK_ASSERTIONS_ENABLED
+  if (CKReadGlobalConfig().shouldPerformFlexboxExtraAssertions) {
+    component->_barrier = 42;
+    component->_childrenSize = component->_children.size();
+    for (const auto& child : component->_children) {
+      // Forcibly create a copy of each `CKFlexboxComponentChild` which will in turn generate arc traffic on `child.component`.
+      // The intention is that the arc traffic will acess if the pointers are valid arc pointers.
+      component->_childrenCopy.push_back(child);
+    }
+    component->_description = _makeDescription(component->_children);
+  }
+#endif
   }
   return component;
 }
 
-static bool skipCompositeComponentSize(const CKFlexboxComponentStyle &style) {
-  return style.skipCompositeComponentSize.valueOr([](){
-    return CKReadGlobalConfig().skipCompositeComponentSize;
-  });
+- (void)dealloc
+{
+#if CK_ASSERTIONS_ENABLED
+  if (CKReadGlobalConfig().shouldPerformFlexboxExtraAssertions) {
+    CKAssert(_barrier == 42, @"Barrier value overriden.\n%@", [_description componentsJoinedByString:@"\n"]);
+    // Somewhat "check" containers integrity.
+    CKAssert(_childrenCopy.size() == _childrenSize, @"_childrenCopy seems busted?\n%@", [_description componentsJoinedByString:@"\n"]);
+    CKAssert(_children.size() == _childrenSize, @"_children seems busted?\n%@", [_description componentsJoinedByString:@"\n"]);
+
+    if (_barrier == 42 && _childrenCopy.size() == _children.size()) {
+      // Check that _children && _childrenCopy are the same w/o trigering arc traffic.
+      for (std::size_t i = 0; i < _childrenSize; ++i) {
+        const auto &c = _children[i];
+        const auto &c2 = _childrenCopy[i];
+        CKAssert(
+          c.component == c2.component,
+          @"Child at index: %ld is different from copy, something was changed between `+new` and `-dealloc`.\n%@",
+          (long)i, [_description componentsJoinedByString:@"\n"]);
+      }
+      // Retriger copy of both _children and _childrenCopy to generate arc traffic
+      const auto copy = _childrenCopy;
+      _childrenCopy = _children;
+      _childrenCopy = copy;
+    }
+  }
+#endif
+}
+
+static bool setPercentOnChildNode(const CKFlexboxComponentStyle &style) {
+  return style.useDeepYogaTrees || CKReadGlobalConfig().setPercentOnChildNode;
 }
 
 static float convertFloatToYogaRepresentation(const float& value) {
@@ -185,7 +263,7 @@ static CKFlexboxChildCachedLayout* getCKFlexboxChildCachedLayoutFromYogaNode(YGN
 
   if (!CKYogaNodeCanUseCachedMeasurement(YGMeasureModeExactly, width, YGMeasureModeExactly, height, cachedLayout.widthMode, cachedLayout.width, cachedLayout.heightMode, cachedLayout.height, static_cast<float>(cachedLayout.componentLayout.size.width), static_cast<float>(cachedLayout.componentLayout.size.height), 0, 0, ckYogaDefaultConfig())) {
     const CGSize fixedSize = {width, height};
-    const CKComponentLayout componentLayout = CKComputeComponentLayout(cachedLayout.component, convertCKSizeRangeToCKRepresentation(CKSizeRange(fixedSize, fixedSize)), convertCGSizeToCKRepresentation(cachedLayout.parentSize));
+    const CKLayout componentLayout = CKComputeComponentLayout(cachedLayout.component, convertCKSizeRangeToCKRepresentation(CKSizeRange(fixedSize, fixedSize)), convertCGSizeToCKRepresentation(cachedLayout.parentSize));
     cachedLayout.componentLayout = componentLayout;
     cachedLayout.width = width;
     cachedLayout.height = height;
@@ -198,13 +276,13 @@ static CKFlexboxChildCachedLayout* getCKFlexboxChildCachedLayoutFromYogaNode(YGN
 
 static YGDirection ygApplicationDirection()
 {
-  static YGDirection applicationDirection;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    const NSWritingDirection direction = [NSParagraphStyle defaultWritingDirectionForLanguage:nil];
-    applicationDirection = (direction == NSWritingDirectionRightToLeft) ? YGDirectionRTL : YGDirectionLTR;
-  });
-  return applicationDirection;
+  switch (CKGetWritingDirection()) {
+    case CKWritingDirection::Natural:
+    case CKWritingDirection::LeftToRight:
+      return YGDirectionLTR;
+    case CKWritingDirection::RightToLeft:
+      return YGDirectionRTL;
+  }
 }
 
 static YGDirection ygDirectionFromStackStyle(const CKFlexboxComponentStyle &style)
@@ -410,12 +488,11 @@ static bool hasChildWithRelativePositioning(const CKFlexboxComponentChild &child
       YGNodeSetBaselineFunc(childNode, useHeightAsBaselineFunction);
     }
 
-    // If deep yoga trees are on, we need to make
-    // sure we do not include CKCompositeSize as
-    // node size, as it will always we equal to {}
-    // and use it's child size instead
-    const auto nodeSize = _style.useDeepYogaTrees || skipCompositeComponentSize(_style) ? [child.component nodeSize] : [child.component size];
-    applySizeAttributes(childNode, child, nodeSize, parentWidth, parentHeight, _style.useDeepYogaTrees);
+    // We need to make sure we do not include CKCompositeComponent
+    // size as node size, as it will always we equal to {} and
+    // use its child size instead
+    const auto nodeSize = [child.component nodeSize];
+    applySizeAttributes(childNode, child, nodeSize, parentWidth, parentHeight, setPercentOnChildNode(_style));
 
     YGNodeStyleSetFlexGrow(childNode, child.flexGrow);
     YGNodeStyleSetFlexShrink(childNode, child.flexShrink);
@@ -509,7 +586,7 @@ static void applySizeAttribute(YGNodeRef node,
                                const CKRelativeDimension &childAttribute,
                                const CKRelativeDimension &nodeAttribute,
                                CGFloat parentValue,
-                               BOOL useDeepYogaTrees)
+                               BOOL setPercentOnChildNode)
 {
   switch (childAttribute.type()) {
     case CKRelativeDimension::Type::PERCENT:
@@ -519,7 +596,7 @@ static void applySizeAttribute(YGNodeRef node,
       pointFunc(node, convertFloatToYogaRepresentation(childAttribute.value()));
       break;
     case CKRelativeDimension::Type::AUTO:
-      if (useDeepYogaTrees) {
+      if (setPercentOnChildNode) {
         switch (nodeAttribute.type()) {
           case CKRelativeDimension::Type::PERCENT:
             percentFunc(node, convertFloatToYogaRepresentation(nodeAttribute.value() * 100));
@@ -547,16 +624,16 @@ static void applySizeAttributes(YGNodeRef node,
                                 const CKComponentSize &nodeSize,
                                 CGFloat parentWidth,
                                 CGFloat parentHeight,
-                                BOOL useDeepYogaTrees)
+                                BOOL setPercentOnChildNode)
 {
   const CKComponentSize childSize = child.sizeConstraints;
 
-  applySizeAttribute(node, &YGNodeStyleSetWidthPercent, &YGNodeStyleSetWidth, childSize.width, nodeSize.width, parentWidth, useDeepYogaTrees);
-  applySizeAttribute(node, &YGNodeStyleSetHeightPercent, &YGNodeStyleSetHeight, childSize.height, nodeSize.height, parentHeight, useDeepYogaTrees);
-  applySizeAttribute(node, &YGNodeStyleSetMinWidthPercent, &YGNodeStyleSetMinWidth, childSize.minWidth, nodeSize.minWidth, parentWidth, useDeepYogaTrees);
-  applySizeAttribute(node, &YGNodeStyleSetMaxWidthPercent, &YGNodeStyleSetMaxWidth, childSize.maxWidth, nodeSize.maxWidth, parentWidth, useDeepYogaTrees);
-  applySizeAttribute(node, &YGNodeStyleSetMinHeightPercent, &YGNodeStyleSetMinHeight, childSize.minHeight, nodeSize.minHeight, parentHeight, useDeepYogaTrees);
-  applySizeAttribute(node, &YGNodeStyleSetMaxHeightPercent, &YGNodeStyleSetMaxHeight, childSize.maxHeight, nodeSize.maxHeight, parentHeight, useDeepYogaTrees);
+  applySizeAttribute(node, &YGNodeStyleSetWidthPercent, &YGNodeStyleSetWidth, childSize.width, nodeSize.width, parentWidth, setPercentOnChildNode);
+  applySizeAttribute(node, &YGNodeStyleSetHeightPercent, &YGNodeStyleSetHeight, childSize.height, nodeSize.height, parentHeight, setPercentOnChildNode);
+  applySizeAttribute(node, &YGNodeStyleSetMinWidthPercent, &YGNodeStyleSetMinWidth, childSize.minWidth, nodeSize.minWidth, parentWidth, setPercentOnChildNode);
+  applySizeAttribute(node, &YGNodeStyleSetMaxWidthPercent, &YGNodeStyleSetMaxWidth, childSize.maxWidth, nodeSize.maxWidth, parentWidth, setPercentOnChildNode);
+  applySizeAttribute(node, &YGNodeStyleSetMinHeightPercent, &YGNodeStyleSetMinHeight, childSize.minHeight, nodeSize.minHeight, parentHeight, setPercentOnChildNode);
+  applySizeAttribute(node, &YGNodeStyleSetMaxHeightPercent, &YGNodeStyleSetMaxHeight, childSize.maxHeight, nodeSize.maxHeight, parentHeight, setPercentOnChildNode);
 }
 
 static void applyPositionToEdge(YGNodeRef node, YGEdge edge, CKFlexboxDimension value)
@@ -624,7 +701,7 @@ static void applyBorderToEdge(YGNodeRef node, YGEdge edge, CKFlexboxBorderDimens
   YGNodeStyleSetBorder(node, edge, convertFloatToYogaRepresentation(value.value()));
 }
 
-- (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
+- (CKLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
 {
   const CKSizeRange sanitizedSizeRange = convertCKSizeRangeToYogaRepresentation(constrainedSize);
   // We create cache for the duration of single calculation, so it is used only on one thread
@@ -638,7 +715,7 @@ static void applyBorderToEdge(YGNodeRef node, YGEdge edge, CKFlexboxBorderDimens
   return [self layoutFromYgNode:layoutNode thatFits:constrainedSize];
 }
 
-- (CKComponentLayout)layoutFromYgNode:(YGNodeRef)layoutNode thatFits:(CKSizeRange)constrainedSize
+- (CKLayout)layoutFromYgNode:(YGNodeRef)layoutNode thatFits:(CKSizeRange)constrainedSize
 {
   // Before we finalize layout we want to sort children according to their z-order
   // We want children with higher z-order to be closer to the end of list
@@ -655,7 +732,7 @@ static void applyBorderToEdge(YGNodeRef node, YGEdge edge, CKFlexboxBorderDimens
               return aCachedContext.zIndex < bCachedContext.zIndex;
             });
 
-  std::vector<CKComponentLayoutChild> childrenLayout(childCount);
+  std::vector<CKLayoutChild> childrenLayout(childCount);
   const float width = convertFloatToCKRepresentation(YGNodeLayoutGetWidth(layoutNode));
   const float height = convertFloatToCKRepresentation(YGNodeLayoutGetHeight(layoutNode));
   const CGSize size = {width, height};

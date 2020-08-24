@@ -93,8 +93,7 @@ void CKComponentAttachControllerAttachComponentRootLayout(
                                                       view,
                                                       params.scopeIdentifier,
                                                       params.boundsAnimation,
-                                                      params.analyticsListener,
-                                                      params.isUpdate);
+                                                      params.analyticsListener);
   // Mark the view as attached and associates it to the right attach state
   self->_scopeIdentifierToAttachedViewMap[@(params.scopeIdentifier)] = view;
   // Save layout provider in map, it will be used for figuring out animations between two layouts.
@@ -153,8 +152,7 @@ static CKComponentAttachState *mountComponentLayoutInView(const CKComponentRootL
                                                           UIView *view,
                                                           CKComponentScopeRootIdentifier scopeIdentifier,
                                                           const CKComponentBoundsAnimation &boundsAnimation,
-                                                          id<CKAnalyticsListener> analyticsListener,
-                                                          BOOL isUpdate)
+                                                          id<CKAnalyticsListener> analyticsListener)
 {
   CKCAssertNotNil(view, @"Impossible to mount a component layout on a nil view");
   [analyticsListener willCollectAnimationsFromComponentTreeWithRootComponent:rootLayout.component()];
@@ -169,11 +167,15 @@ static CKComponentAttachState *mountComponentLayoutInView(const CKComponentRootL
   NSSet *currentlyMountedComponents = oldAttachState.mountedComponents;
   __block NSSet *newMountedComponents = nil;
   const auto mountPerformer = ^{
-    __block NSSet<CKComponent *> *unmountedComponents;
+    __block NSMutableSet<CKComponent *> *unmountedComponents;
     CKComponentBoundsAnimationApply(boundsAnimation, ^{
-      const auto result = CKMountComponentLayout(rootLayout.layout(), view, currentlyMountedComponents, nil, analyticsListener, isUpdate);
-      newMountedComponents = result.mountedComponents;
-      unmountedComponents = result.unmountedComponents;
+      newMountedComponents = CKMountComponentLayout(rootLayout.layout(), view, currentlyMountedComponents, nil, analyticsListener);
+
+      // This could probably be done more efficiently by making mountPerformer
+      // return a pair: currentlyMountedComponents & newMountedComponents.
+      // Then we can skip the allocation and simply enumerate over the two sets.
+      unmountedComponents = [currentlyMountedComponents mutableCopy];
+      [unmountedComponents minusSet:newMountedComponents];
     }, nil);
     return unmountedComponents;
   };

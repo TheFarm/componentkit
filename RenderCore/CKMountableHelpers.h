@@ -14,21 +14,44 @@
 
 #import <UIKit/UIKit.h>
 
-#import <RenderCore/CKMountable.h>
-
 #ifndef __cplusplus
 #error This file must be compiled as Obj-C++. If you are importing it, you must change your file extension to .mm.
 #endif
 
-/** This is a helper function which sets the view position and bounds during mount */
-void CKSetViewPositionAndBounds(UIView *v,
-                                const CK::Component::MountContext &context,
-                                const CGSize size,
-                                std::shared_ptr<const std::vector<CKComponentLayoutChild> > children,
-                                id<CKMountable> supercomponent,
-                                Class<CKMountable> klass);
+#import <RenderCore/ComponentMountContext.h>
 
-/** This is a helper function which sets the view position and bounds during mount */
+@protocol CKMountable;
+struct CKLayout;
+struct CKMountInfo;
+struct CKViewConfiguration;
+
+using CKMountCallbackFunction = void(*)(id<CKMountable> mountable, UIView *view);
+
+/**
+ The CKMountable protocol requires implementing the mounting method
+ `-mountInContext:layout:supercomponent:`. In practice most implementations
+ can use this helper function to perform the mounting operation.
+
+ @param mountInfo The storage for CKMountInfo; usually this will be an ivar
+ from the class that conforms to CKMountable.
+ */
+CK::Component::MountResult CKPerformMount(std::unique_ptr<CKMountInfo> &mountInfo,
+                                          const CKLayout &layout,
+                                          const CKViewConfiguration &viewConfiguration,
+                                          const CK::Component::MountContext &context,
+                                          const id<CKMountable> supercomponent,
+                                          const CKMountCallbackFunction didAcquireViewFunction,
+                                          const CKMountCallbackFunction willRelinquishViewFunction);
+
+/**
+ Similar to CKPerformMount: a standard implementation of unmounting that can
+ be used by most classes conforming to CKMountable.
+ */
+void CKPerformUnmount(std::unique_ptr<CKMountInfo> &mountInfo,
+                      const id<CKMountable> mountable,
+                      const CKMountCallbackFunction willRelinquishViewFunction);
+
+/** A helper function to set view position and bounds during mount. */
 void CKSetViewPositionAndBounds(UIView *v,
                                 const CK::Component::MountContext &context,
                                 const CGSize size);

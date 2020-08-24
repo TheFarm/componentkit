@@ -11,7 +11,6 @@
 #import "CKCompositeComponent.h"
 
 #import <ComponentKit/CKAssert.h>
-#import <ComponentKit/CKComponentDescriptionHelper.h>
 #import <ComponentKit/CKMacros.h>
 #import <ComponentKit/CKInternalHelpers.h>
 
@@ -22,7 +21,7 @@
 
 @implementation CKCompositeComponent
 {
-  CKComponent *_child;
+  id<CKMountable> _child;
 }
 
 #if DEBUG
@@ -42,7 +41,7 @@
 #endif
 
 - (instancetype _Nullable)initWithView:(const CKComponentViewConfiguration &)view
-                             component:(CKComponent  * _Nullable)component
+                             component:(id<CKMountable> _Nullable)component
 {
   if (component == nil) {
     return nil;
@@ -54,17 +53,17 @@
   return self;
 }
 
-- (instancetype _Nullable)initWithComponent:(CKComponent * _Nullable)component
+- (instancetype _Nullable)initWithComponent:(id<CKMountable> _Nullable)component
 {
   return [self initWithView:{} component:component];
 }
 
-+ (instancetype)newWithComponent:(CKComponent *)component
++ (instancetype)newWithComponent:(id<CKMountable>)component
 {
   return [self newWithView:{} component:component];
 }
 
-+ (instancetype)newWithView:(const CKComponentViewConfiguration &)view component:(CKComponent *)component
++ (instancetype)newWithView:(const CKComponentViewConfiguration &)view component:(id<CKMountable>)component
 {
   if (component == nil) {
     return nil;
@@ -83,12 +82,7 @@
   CK_NOT_DESIGNATED_INITIALIZER();
 }
 
-- (NSString *)description
-{
-  return CKComponentDescriptionWithChildren([super description], [NSArray arrayWithObjects:_child, nil]);
-}
-
-- (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
+- (CKLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
                           restrictedToSize:(const CKComponentSize &)size
                       relativeToParentSize:(CGSize)parentSize
 {
@@ -96,12 +90,12 @@
            @"CKCompositeComponent only passes size {} to the super class initializer, but received size %@ "
            "(component=%@)", size.description(), _child);
 
-  CKComponentLayout l = [_child layoutThatFits:constrainedSize parentSize:parentSize];
+  CKLayout l = [_child layoutThatFits:constrainedSize parentSize:parentSize];
   const auto lSize = l.size;
   return {self, lSize, {{{0,0}, std::move(l)}}};
 }
 
-- (CKComponent *)child
+- (id<CKMountable>)child
 {
   return _child;
 }
@@ -109,7 +103,7 @@
 - (UIView *)viewForAnimation
 {
   // Delegate to the wrapped component's viewForAnimation if we don't have one.
-  return [super viewForAnimation] ?: [_child viewForAnimation];
+  return [super viewForAnimation] ?: [CKReturnIfResponds(_child, @selector(viewForAnimation)) viewForAnimation];
 }
 
 - (unsigned int)numberOfChildren

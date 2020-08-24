@@ -23,10 +23,15 @@ struct CKGlobalConfig {
   /** If enabled, CKBuildComponent will always build the component tree (CKTreeNode), even if there is no Render component in the tree*/
   BOOL alwaysBuildRenderTree = NO;
   /**
-   Uses the composite component child size to assign size
-   properties on yoga node instead of the size of composite component itself
+   Uses the overlayout layout component child size to assign size
+   properties on yoga node instead of the size of overlayout component itself
    */
-  BOOL skipCompositeComponentSize = YES;
+  BOOL useNodeSizeOverlayComponent = NO;
+  /**
+   Instead of setting resolving the percentage size manually from parent size
+   set the percent on the yoga node itself instead
+   */
+  BOOL setPercentOnChildNode = NO;
   /**
    Use new method of performing optimistic mutations which can last beyond next mount
    */
@@ -36,9 +41,9 @@ struct CKGlobalConfig {
    */
    CKComponentCoalescingMode coalescingMode = CKComponentCoalescingModeNone;
    /**
-    Used for migrating `lastMountedComponent` in `CKComponentController`.
+    When true flexbox has additional assertions.
     */
-   BOOL lastMountedComponentMigrationEnabled = NO;
+   BOOL shouldPerformFlexboxExtraAssertions = NO;
 };
 
 CKGlobalConfig CKReadGlobalConfig();

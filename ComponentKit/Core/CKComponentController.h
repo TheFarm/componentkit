@@ -87,19 +87,13 @@
  Called on the main thread when a new component has been created and its layout has been calculated.
  This layout will be used during the next mount (unless another state update will be triggered).
  */
-- (void)didPrepareLayout:(const CKComponentLayout &)layout forComponent:(CKComponent *)component;
+- (void)didPrepareLayout:(const CKLayout &)layout forComponent:(CKComponent *)component;
 
 /** The current version of the component. */
 @property (nonatomic, weak, readonly) ComponentType component;
 
 /** The view created by the component, if currently mounted. */
 @property (nonatomic, strong, readonly) UIView *view;
-
-/**
- This returns the component that was last mounted. It can be `nil` if the latest generation hasn't been mounted.
- NOTE: this is for code migration purpose, please DO NOT USE.
- */
-- (ComponentType)lastMountedComponent;
 
 /**
  While the controller's component is mounted, returns its next responder. This is the first of:

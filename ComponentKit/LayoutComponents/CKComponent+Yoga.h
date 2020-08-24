@@ -15,6 +15,7 @@
 #import <ComponentKit/CKComponent.h>
 #import <ComponentKit/CKComponentLayout.h>
 #import <ComponentKit/CKCompositeComponent.h>
+#import <ComponentKit/CKOverlayLayoutComponent.h>
 #import <ComponentKit/CKLinkable.h>
 
 #import "yoga/Yoga.h"
@@ -53,7 +54,7 @@ YGConfigRef _Nonnull ckYogaDefaultConfig();
 
  By default returns an empty layout
  */
-- (CKComponentLayout)layoutFromYgNode:(YGNodeRef _Nonnull)layoutNode thatFits:(CKSizeRange)constrainedSize;
+- (CKLayout)layoutFromYgNode:(YGNodeRef _Nonnull)layoutNode thatFits:(CKSizeRange)constrainedSize;
 
 /**
  A flag that represents whether the component's layout sets a custom baseline value using the key
@@ -70,6 +71,10 @@ CK_LINK_REQUIRE_CATEGORY(CKComponent_Yoga)
 
 CK_LINK_REQUIRE_CATEGORY(CKCompositeComponent_Yoga)
 @interface CKCompositeComponent (Yoga)
+@end
+
+CK_LINK_REQUIRE_CATEGORY(CKOverlayLayoutComponent_Yoga)
+@interface CKOverlayLayoutComponent (Yoga)
 @end
 
 #endif

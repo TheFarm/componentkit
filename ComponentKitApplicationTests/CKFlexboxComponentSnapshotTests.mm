@@ -44,9 +44,9 @@
   return c;
 }
 
-- (CKComponentLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
+- (CKLayout)computeLayoutThatFits:(CKSizeRange)constrainedSize
 {
-  CKComponentLayout parentLayout = [super computeLayoutThatFits:constrainedSize];
+  CKLayout parentLayout = [super computeLayoutThatFits:constrainedSize];
   NSMutableDictionary *extra = parentLayout.extra ? [parentLayout.extra mutableCopy]: [NSMutableDictionary dictionary];
   extra[kCKComponentLayoutExtraBaselineKey] = @(_baseline);
   parentLayout.extra = extra;
@@ -128,7 +128,7 @@ static CKComponentViewConfiguration kLightGrayBackgroundView = {
           .flexGrow(1)
           .flexShrink(1)
   .build();
-  
+
   static CKSizeRange kSize = {{500, 500}, {500, 500}};
   CKSnapshotVerifyComponent(c, kSize, nil);
 }
@@ -1378,7 +1378,7 @@ static CKComponentViewConfiguration kLightGrayBackgroundView = {
             .build())
         .build())
   .build();
-  
+
   static CKSizeRange kSize = {{0,0}, {INFINITY, INFINITY}};
   CKSnapshotVerifyComponent(c, kSize, nil);
 }
@@ -1858,9 +1858,9 @@ static CKComponentViewConfiguration kLightGrayBackgroundView = {
            .build())
       .marginTop(20)
     .build();
-  
+
   const CKSizeRange kSize = {{200, 0}, {200, INFINITY}};
-  
+
   CKSnapshotVerifyComponent(c, kSize, nil);
 }
 
@@ -2769,7 +2769,7 @@ static CKComponentViewConfiguration kLightGrayBackgroundView = {
    children:{
      {
        // CKCompositeComponent is used just to verify that CKFlexboxComponent is actually
-       // laying out each child at the correct size, not just setting CKComponentLayout.size.
+       // laying out each child at the correct size, not just setting CKLayout.size.
        [CKCompositeComponent
         newWithComponent:
         [CKComponent
@@ -3071,39 +3071,6 @@ static CKFlexboxComponentChild flexChild(CKComponent *c, CGFloat flexFactor)
      flexChild([CKComponent newWithView:{[UIView class], {{@selector(setBackgroundColor:), [UIColor blueColor]}}} size:{50,50}], flexFactor),
      flexChild([CKComponent newWithView:{[UIView class], {{@selector(setBackgroundColor:), [UIColor greenColor]}}} size:{50,50}], flexFactor),
    }];
-}
-
-- (void)testFlexChildWrappedWithCompositeComponent
-{
-  // This is a minimalistic test case that
-  // shows how wrapping a component with explicit size
-  // set with a CKCompositeComponent can result
-  // in an inconsistent layout.
-  // **Note** with deep yoga trees flag on
-  // we get the consistent behaviour as this
-  // scenario has been explicitely solved
-  auto const c = CK::FlexboxComponentBuilder()
-  .direction(CKFlexboxDirectionColumn)
-  .useDeepYogaTrees(_useDeepYogaTrees)
-  .skipCompositeComponentSize(false)
-  .child(CK::ComponentBuilder()
-          .viewClass([UIView class])
-          .backgroundColor([UIColor greenColor])
-          .width(200)
-          .height(200)
-          .build())
-  .child(CK::CompositeComponentBuilder()
-          .component(CK::ComponentBuilder()
-            .viewClass([UIView class])
-            .backgroundColor([UIColor redColor])
-            .width(200)
-            .height(200)
-            .build())
-          .build())
-  .build();
-  
-  static CKSizeRange kSize = {{400, 0}, {400, INFINITY}};
-  CKSnapshotVerifyComponent(c, kSize, nil);
 }
 
 @end

@@ -23,12 +23,23 @@
 #import "CKComponentCreationValidation.h"
 
 namespace CKBuildComponentHelpers {
-  auto getBuildTrigger(CKComponentScopeRoot *scopeRoot, const CKComponentStateUpdateMap &stateUpdates) -> CKBuildTrigger
+  auto getBuildTrigger(CK::NonNull<CKComponentScopeRoot *> scopeRoot,
+                       const CKComponentStateUpdateMap &stateUpdates,
+                       BOOL treeHasPropsUpdate) -> CKBuildTrigger
   {
-    if (!scopeRoot.rootNode.isEmpty()) {
-      return (stateUpdates.size() > 0) ? CKBuildTrigger::StateUpdate : CKBuildTrigger::PropsUpdate;
+    CKBuildTrigger trigger = CKBuildTriggerNone;
+
+    if ([scopeRoot rootComponent] != nil) {
+      if (stateUpdates.empty() == false) {
+        trigger |= CKBuildTriggerStateUpdate;
+      }
+
+      if (stateUpdates.empty() || treeHasPropsUpdate) {
+        trigger |= CKBuildTriggerPropsUpdate;
+      }
     }
-    return CKBuildTrigger::NewTree;
+
+    return trigger;
   }
 
   /**
@@ -71,16 +82,17 @@ namespace CKBuildComponentHelpers {
   }
 }
 
-CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
+CKBuildComponentResult CKBuildComponent(CK::NonNull<CKComponentScopeRoot *> previousRoot,
                                         const CKComponentStateUpdateMap &stateUpdates,
                                         NS_NOESCAPE CKComponent *(^componentFactory)(void),
                                         BOOL enableComponentReuseOptimizations,
+                                        BOOL treeHasPropsUpdate,
                                         CKComponentCoalescingMode coalescingMode)
 {
   CKCAssertNotNil(componentFactory, @"Must have component factory to build a component");
   auto const globalConfig = CKReadGlobalConfig();
 
-  auto const buildTrigger = CKBuildComponentHelpers::getBuildTrigger(previousRoot, stateUpdates);
+  auto const buildTrigger = CKBuildComponentHelpers::getBuildTrigger(previousRoot, stateUpdates, treeHasPropsUpdate);
   auto const analyticsListener = [previousRoot analyticsListener];
   auto const shouldCollectTreeNodeCreationInformation = [analyticsListener shouldCollectTreeNodeCreationInformation:previousRoot];
 
@@ -102,16 +114,16 @@ CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
   auto const component = componentFactory();
 
   // Build the component tree if we have a render component in the hierarchy.
-  if (threadScope.newScopeRoot.hasRenderComponentInTree || globalConfig.alwaysBuildRenderTree) {
+  if ([threadScope.newScopeRoot hasRenderComponentInTree] || globalConfig.alwaysBuildRenderTree) {
     CKBuildComponentTreeParams params = {
       .scopeRoot = threadScope.newScopeRoot,
       .previousScopeRoot = previousRoot,
       .stateUpdates = stateUpdates,
       .treeNodeDirtyIds = threadScope.treeNodeDirtyIds,
       .buildTrigger = buildTrigger,
-      .enableComponentReuseOptimizations = enableComponentReuseOptimizations,
       .systraceListener = threadScope.systraceListener,
       .shouldCollectTreeNodeCreationInformation = shouldCollectTreeNodeCreationInformation,
+      .enableComponentReuseOptimizations = enableComponentReuseOptimizations,
       .coalescingMode = coalescingMode,
     };
 
@@ -119,18 +131,20 @@ CKBuildComponentResult CKBuildComponent(CKComponentScopeRoot *previousRoot,
     CKRender::ComponentTree::Root::build(component, params);
   }
 
-  CKComponentScopeRoot *newScopeRoot = threadScope.newScopeRoot;
+  auto newScopeRoot = threadScope.newScopeRoot;
+  auto const boundsAnimation = CKBuildComponentHelpers::boundsAnimationFromPreviousScopeRoot(newScopeRoot, previousRoot);
 
   [analyticsListener didBuildComponentTreeWithScopeRoot:newScopeRoot
                                            buildTrigger:buildTrigger
                                            stateUpdates:stateUpdates
                                               component:component
-                      enableComponentReuseOptimizations:enableComponentReuseOptimizations];
-  newScopeRoot.rootComponent = component;
+                      enableComponentReuseOptimizations:enableComponentReuseOptimizations
+                                        boundsAnimation:boundsAnimation];
+  [newScopeRoot setRootComponent:component];
   return {
     .component = component,
     .scopeRoot = newScopeRoot,
-    .boundsAnimation = CKBuildComponentHelpers::boundsAnimationFromPreviousScopeRoot(newScopeRoot, previousRoot),
+    .boundsAnimation = boundsAnimation,
     .buildTrigger = buildTrigger,
   };
 }

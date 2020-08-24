@@ -20,6 +20,7 @@
 #import <ComponentKit/CKComponentControllerHelper.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
 #import <ComponentKit/CKComponentScopeRootFactory.h>
+#import <ComponentKit/CKDelayedInitialisationWrapper.h>
 #import <ComponentKit/CKGlobalConfig.h>
 #import <ComponentKit/CKSystraceScope.h>
 #import <ComponentKit/CKTraitCollectionHelper.h>
@@ -29,16 +30,54 @@ static void *kAffinedQueueKey = &kAffinedQueueKey;
 #define CKAssertAffinedQueue() CKCAssert(_isRunningOnAffinedQueue(), @"This method must only be called on the affined queue")
 
 struct CKComponentGeneratorInputs {
-  CKComponentScopeRoot *scopeRoot;
-  id<NSObject> model;
-  id<NSObject> context;
+  CK::NonNull<CKComponentScopeRoot *> scopeRoot;
   CKComponentStateUpdateMap stateUpdates;
   BOOL enableComponentReuse;
   UITraitCollection *traitCollection;
 
+  CKComponentGeneratorInputs(CK::NonNull<CKComponentScopeRoot *> scopeRoot) : scopeRoot(std::move(scopeRoot)) { }
+
+  void updateModel(id<NSObject> model) {
+    _didUpdateModelOrContext = _didUpdateModelOrContext || (model != _model);
+    _model = model;
+  }
+
+  void updateContext(id<NSObject> context) {
+    _didUpdateModelOrContext = _didUpdateModelOrContext || (context != _context);
+    _context = context;
+  }
+
+  id<NSObject> model() const {
+    return _model;
+  }
+
+  id<NSObject> context() const {
+    return _context;
+  }
+
+  BOOL didUpdateModelOrContext() const {
+    return _didUpdateModelOrContext;
+  }
+
   bool operator==(const CKComponentGeneratorInputs &i) const {
-    return scopeRoot == i.scopeRoot && model == i.model && context == i.context && stateUpdates == i.stateUpdates && enableComponentReuse == i.enableComponentReuse;
-  };
+    return scopeRoot == i.scopeRoot &&
+      _model == i._model &&
+      _context == i._context &&
+      stateUpdates == i.stateUpdates &&
+      enableComponentReuse == i.enableComponentReuse &&
+      _didUpdateModelOrContext == i._didUpdateModelOrContext;
+  }
+
+  void reset(CK::NonNull<CKComponentScopeRoot *> newScopeRoot) {
+    scopeRoot = newScopeRoot;
+    stateUpdates = {};
+    _didUpdateModelOrContext = NO;
+  }
+
+private:
+  id<NSObject> _model;
+  id<NSObject> _context;
+  BOOL _didUpdateModelOrContext;
 };
 
 /**
@@ -47,7 +86,7 @@ struct CKComponentGeneratorInputs {
 struct CKComponentGeneratorInputsStore {
   CKComponentGeneratorInputsStore(dispatch_queue_t affinedQueue,
                                   CKComponentGeneratorInputs inputs)
-  : _affinedQueue(affinedQueue), _inputs(inputs) {
+  : _affinedQueue(affinedQueue), _inputs(std::move(inputs)) {
     if (_affinedQueue != nil && _affinedQueue != dispatch_get_main_queue()) {
       dispatch_queue_set_specific(_affinedQueue, kAffinedQueueKey, kAffinedQueueKey, NULL);
     }
@@ -68,7 +107,7 @@ private:
   std::mutex _inputsMutex;
   CKComponentGeneratorInputs _inputs;
 
-  BOOL _isRunningOnAffinedQueue()
+  BOOL _isRunningOnAffinedQueue() const
   {
     if (_affinedQueue == dispatch_get_main_queue()) {
       return [NSThread isMainThread];
@@ -96,12 +135,12 @@ private:
     _delegate = options.delegate;
     _componentProvider = options.componentProvider;
     _inputsStore =
-    std::make_unique<CKComponentGeneratorInputsStore>(options.affinedQueue, CKComponentGeneratorInputs {
-      .scopeRoot = CKComponentScopeRootWithPredicates(self,
-                                                      options.analyticsListener ?: CKReadGlobalConfig().defaultAnalyticsListener,
-                                                      options.componentPredicates,
-                                                      options.componentControllerPredicates)
-    });
+    std::make_unique<CKComponentGeneratorInputsStore>(options.affinedQueue,
+      CKComponentScopeRootWithPredicates(self,
+                                         options.analyticsListener ?: CKReadGlobalConfig().defaultAnalyticsListener,
+                                         options.componentPredicates,
+                                         options.componentControllerPredicates)
+    );
     _affinedQueue = options.affinedQueue;
   }
   return self;
@@ -132,14 +171,14 @@ private:
 - (void)updateModel:(id<NSObject>)model
 {
   _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &inputs) {
-    inputs.model = model;
+    inputs.updateModel(model);
   });
 }
 
 - (void)updateContext:(id<NSObject>)context
 {
   _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &inputs) {
-    inputs.context = context;
+    inputs.updateContext(context);
   });
 }
 
@@ -149,16 +188,16 @@ private:
   _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &inputs) {
     const auto enableComponentReuse = inputs.enableComponentReuse;
     inputs.enableComponentReuse = YES;
-    __block CKBuildComponentResult result;
+    __block CK::DelayedInitialisationWrapper<CKBuildComponentResult> result;
     CKPerformWithCurrentTraitCollection(inputs.traitCollection, ^{
       result = CKBuildComponent(inputs.scopeRoot, inputs.stateUpdates, ^{
-        return _componentProvider(inputs.model, inputs.context);
-      }, enableComponentReuse);
+        return _componentProvider(inputs.model(), inputs.context());
+      }, enableComponentReuse, inputs.didUpdateModelOrContext());
     });
     _applyResult(result,
                  inputs,
-                 _addedComponentControllersBetweenScopeRoots(result.scopeRoot, inputs.scopeRoot),
-                 _invalidComponentControllersBetweenScopeRoots(result.scopeRoot, inputs.scopeRoot));
+                 _addedComponentControllersBetweenScopeRoots(result.get().scopeRoot, inputs.scopeRoot),
+                 _invalidComponentControllersBetweenScopeRoots(result.get().scopeRoot, inputs.scopeRoot));
     return result;
   });
 }
@@ -172,6 +211,7 @@ private:
   // Avoid capturing `self` in global queue so that `CKComponentGenerator` does not have a chance to be deallocated outside affined queue.
   const auto componentProvider = _componentProvider;
   const auto affinedQueue = _affinedQueue;
+  __weak const auto weakSelf = self;
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     CKSystraceScope generationScope(asyncGeneration);
     __block std::shared_ptr<const CKBuildComponentResult> result = nullptr;
@@ -179,8 +219,9 @@ private:
       result = std::make_shared<const CKBuildComponentResult>(CKBuildComponent(
         inputs->scopeRoot,
         inputs->stateUpdates,
-        ^{ return componentProvider(inputs->model, inputs->context); },
-        inputs->enableComponentReuse
+        ^{ return componentProvider(inputs->model(), inputs->context()); },
+        inputs->enableComponentReuse,
+        inputs->didUpdateModelOrContext()
       ));
     });
     const auto addedComponentControllers =
@@ -191,11 +232,15 @@ private:
 
     const auto applyResult = ^{
       CKSystraceScope applicationScope(asyncApplication);
-      if (![_delegate componentGeneratorShouldApplyAsynchronousGenerationResult:self]) {
+      const auto strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      if (![strongSelf->_delegate componentGeneratorShouldApplyAsynchronousGenerationResult:strongSelf]) {
         return;
       }
       // If the inputs haven't changed, apply the result; otherwise, retry.
-      const auto shouldRetry = _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &_inputs){
+      const auto shouldRetry = strongSelf->_inputsStore->acquireInputs(^(CKComponentGeneratorInputs &_inputs){
         if (_inputs == *inputs) {
           _inputs.enableComponentReuse = YES;
           _applyResult(*result,
@@ -208,9 +253,9 @@ private:
         }
       });
       if (shouldRetry) {
-        [self generateComponentAsynchronously];
+        [strongSelf generateComponentAsynchronously];
       } else {
-        [_delegate componentGenerator:self didAsynchronouslyGenerateComponentResult:*result];
+        [strongSelf->_delegate componentGenerator:strongSelf didAsynchronouslyGenerateComponentResult:*result];
       }
     };
 
@@ -236,7 +281,7 @@ private:
   });
 }
 
-- (void)setScopeRoot:(CKComponentScopeRoot *)scopeRoot
+- (void)setScopeRoot:(CK::NonNull<CKComponentScopeRoot *>)scopeRoot
 {
   _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &inputs){
     _notifyInitializationControllerEvents(_addedComponentControllersBetweenScopeRoots(scopeRoot, inputs.scopeRoot));
@@ -254,15 +299,14 @@ static void _applyResult(const CKBuildComponentResult &result,
 {
   _notifyInitializationControllerEvents(addedComponentControllers);
   _notifyInvalidateControllerEvents(invalidComponentControllers);
-  inputs.scopeRoot = result.scopeRoot;
-  inputs.stateUpdates = {};
+  inputs.reset(result.scopeRoot);
 }
 
 static void _notifyInvalidateControllerEvents(const std::vector<CKComponentController *> &invalidComponentControllers)
 {
   const auto componentControllers = std::make_shared<std::vector<CKComponentController *>>(invalidComponentControllers);
   const auto invalidateControllers = ^{
-    for (const auto componentController : *componentControllers) {
+    for (auto componentController : *componentControllers) {
       [componentController invalidateController];
     }
   };
@@ -277,7 +321,7 @@ static void _notifyInitializationControllerEvents(const std::vector<CKComponentC
 {
   const auto componentControllers = std::make_shared<std::vector<CKComponentController *>>(addedComponentControllers);
   const auto didInitControllers = ^{
-    for (const auto componentController : *componentControllers) {
+    for (auto componentController : *componentControllers) {
       [componentController didInit];
     }
   };
@@ -321,12 +365,15 @@ static std::vector<CKComponentController *> _addedComponentControllersBetweenSco
   const auto enqueueStateUpdate = ^{
     _inputsStore->acquireInputs(^(CKComponentGeneratorInputs &inputs){
       inputs.stateUpdates[handle].push_back(stateUpdate);
-      [inputs.scopeRoot.analyticsListener didReceiveStateUpdateFromScopeHandle:handle rootIdentifier:rootIdentifier];
+      [[inputs.scopeRoot analyticsListener] didReceiveStateUpdateFromScopeHandle:handle rootIdentifier:rootIdentifier];
     });
     [_delegate componentGenerator:self didReceiveComponentStateUpdateWithMode:mode];
   };
-  if (!_affinedQueue || _affinedQueue == dispatch_get_main_queue()) {
+  if (_affinedQueue == dispatch_get_main_queue()) {
     enqueueStateUpdate();
+  } else if (!_affinedQueue) {
+    // Dispatch to avoid potential deadlock.
+    dispatch_async(dispatch_get_main_queue(), enqueueStateUpdate);
   } else {
     dispatch_async(_affinedQueue, enqueueStateUpdate);
   }

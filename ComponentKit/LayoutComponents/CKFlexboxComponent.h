@@ -264,14 +264,6 @@ struct CKFlexboxComponentStyle {
    If set to NO, will allocate a yoga node for every single child even it is backed by yoga as well
    */
   BOOL useDeepYogaTrees = NO;
-  
-  /**
-   If set to YES, flexbox will use the composite component child size to assign size
-   properties on yoga node instead of the size of composite component itself.
-   
-   This is a temporary flag used for migration purposes.
-   */
-  CK::Optional<BOOL> skipCompositeComponentSize;
 };
 
 struct CKFlexboxComponentChild {
@@ -338,7 +330,7 @@ struct CKFlexboxComponentChild {
 
 extern template class std::vector<CKFlexboxComponentChild>;
 
-/** Keys used to access properties on the CKComponentLayout extra dictionary. */
+/** Keys used to access properties on the CKLayout extra dictionary. */
 extern const struct CKStackComponentLayoutExtraKeys {
   /// NSNumber containing a BOOL which specifies whether a violation of constraints has occurred during layout. The absence of this key indicates that no violation of constraints occurred.
   NSString * const hadOverflow;

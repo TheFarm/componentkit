@@ -15,6 +15,7 @@
 
 #import <ComponentKit/CKAssert.h>
 #import <ComponentKit/CKGlobalConfig.h>
+#import <ComponentKit/CKInternalHelpers.h>
 
 #import "CKComponentInternal.h"
 #import "CKComponentSubclass.h"
@@ -26,6 +27,14 @@ typedef NS_ENUM(NSInteger, CKComponentControllerState) {
   CKComponentControllerStateRemounting,
   CKComponentControllerStateUnmounting,
 };
+
+#if CK_ASSERTIONS_ENABLED
+typedef NS_ENUM(NSInteger, CKComponentControllerLifecycleState) {
+  CKComponentControllerAllocated = 0,
+  CKComponentControllerInitialized,
+  CKComponentControllerInvalidated,
+};
+#endif
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
@@ -55,6 +64,7 @@ static NSString *componentStateName(CKComponentControllerState state)
   std::mutex _componentMutex;
 #if CK_ASSERTIONS_ENABLED
   __weak NSThread *_initializationThread;
+  CKComponentControllerLifecycleState _lifecycleState;
 #endif
 }
 
@@ -67,6 +77,18 @@ static NSString *componentStateName(CKComponentControllerState state)
 #endif
   }
   return self;
+}
+
+- (void)dealloc
+{
+#if CK_ASSERTIONS_ENABLED
+  CKWarn(
+    _lifecycleState == CKComponentControllerInvalidated ||
+    _lifecycleState == CKComponentControllerAllocated ||
+    (_lifecycleState == CKComponentControllerInitialized &&
+     !CKSubclassOverridesInstanceMethod([CKComponentController class], self.class, @selector(invalidateController))),
+    @"Dealloc called but controller (%@) was: %td", self.class, _lifecycleState);
+#endif
 }
 
 - (void)setLatestComponent:(CKComponent *)latestComponent
@@ -94,24 +116,25 @@ static NSString *componentStateName(CKComponentControllerState state)
                          @"`self.component` must be called on the main thread");
   }
 #endif
-  return _component ?: _latestComponent;
-}
-
-- (CKComponent *)lastMountedComponent
-{
-  return CKReadGlobalConfig().lastMountedComponentMigrationEnabled ? self.component : _component;
+  const auto component = _component ?: _latestComponent;
+  CKWarn(component != nil, @"`nil` component shouldn't be returned");
+  return component;
 }
 
 - (CKComponent *)threadSafe_component
 {
+  CKComponent *component = nil;
   if ([NSThread isMainThread]) {
-    return _component ?: _latestComponent;
+    component = _component ?: _latestComponent;
   } else {
     CKAssert(self.shouldAcquireLockWhenUpdatingComponent,
              @"threadSafe_component should only be called when updating component is thread safe as well");
     std::lock_guard<std::mutex> lock(_componentMutex);
-    return _component ?: _latestComponent;
+    component = _component ?: _latestComponent;
   }
+
+  CKWarn(component != nil, @"`nil` component shouldn't be returned");
+  return component;
 }
 
 - (BOOL)shouldAcquireLockWhenUpdatingComponent
@@ -119,7 +142,14 @@ static NSString *componentStateName(CKComponentControllerState state)
   return NO;
 }
 
-- (void)didInit {}
+- (void)didInit {
+#if CK_ASSERTIONS_ENABLED
+  CKWarn(_lifecycleState == CKComponentControllerAllocated,
+         @"Did init called but controller (%@) was: %td", self.class, _lifecycleState);
+  _lifecycleState = CKComponentControllerInitialized;
+#endif
+}
+
 - (void)willMount {}
 - (void)didMount {}
 - (void)willRemount {}
@@ -132,8 +162,17 @@ static NSString *componentStateName(CKComponentControllerState state)
 - (void)componentDidAcquireView {}
 - (void)componentTreeWillAppear {}
 - (void)componentTreeDidDisappear {}
-- (void)invalidateController {}
-- (void)didPrepareLayout:(const CKComponentLayout &)layout forComponent:(CKComponent *)component {}
+- (void)invalidateController {
+#if CK_ASSERTIONS_ENABLED
+  CKWarnWithCategory(_lifecycleState == CKComponentControllerInitialized ||
+                     (_lifecycleState == CKComponentControllerAllocated &&
+                     !CKSubclassOverridesInstanceMethod([CKComponentController class], self.class, @selector(didInit))),
+                     self.component.className,
+                     @"Invalidate called but controller (%@) was: %td", self.class, _lifecycleState);
+  _lifecycleState = CKComponentControllerInvalidated;
+#endif
+}
+- (void)didPrepareLayout:(const CKLayout &)layout forComponent:(CKComponent *)component {}
 
 #pragma mark - Hooks
 

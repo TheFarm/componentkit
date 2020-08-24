@@ -121,25 +121,26 @@ namespace CKRenderInternal {
       return NO;
     }
 
-    // State update branch:
-    if (params.buildTrigger == CKBuildTrigger::StateUpdate) {
+    if (params.buildTrigger & CKBuildTriggerStateUpdate) {
+      // State update branch - only state updates or coalesced state & props update.
       // Check if the tree node is not dirty (not in a branch of a state update).
       auto const dirtyNodeId = params.treeNodeDirtyIds.find(node.nodeIdentifier);
       if (dirtyNodeId == params.treeNodeDirtyIds.end()) {
         // We reuse the component without checking `shouldComponentUpdate:` in the following conditions:
         // 1. The component is not dirty (on a state update branch)
         // 2. No direct parent has a state update
-        if (!parentHasStateUpdate) {
+        // 3. Not a coalesced state & props update.
+        if (!parentHasStateUpdate &&
+            params.buildTrigger == CKBuildTriggerStateUpdate) {
           // Faster state update optimizations.
           return CKRenderInternal::reusePreviousComponent(component, childComponent, node, parent, previousParent, params, didReuseBlock);
         }
         // We fallback to the props update optimization in the follwing case:
-        // - The component is not dirty, but the parent has a state update.
+        // - The component is not dirty, but the parent has a state update or tree props were updated.
         return (CKRenderInternal::reusePreviousComponentIfComponentsAreEqual(component, childComponent, node, parent, previousParent, params, didReuseBlock));
       }
-    }
-    // Props update branch:
-    else if (params.buildTrigger == CKBuildTrigger::PropsUpdate) {
+    } else if (params.buildTrigger == CKBuildTriggerPropsUpdate) {
+      // Will be used for coalesced props & state updates too.
       return CKRenderInternal::reusePreviousComponentIfComponentsAreEqual(component, childComponent, node, parent, previousParent, params, didReuseBlock);
     }
 
@@ -200,7 +201,7 @@ namespace CKRender {
       // Update the `parentHasStateUpdate` param for Faster state/props updates.
       // TODO: Share this value with the value precomputed in the scope
       parentHasStateUpdate = parentHasStateUpdate ||
-      (params.buildTrigger == CKBuildTrigger::StateUpdate &&
+      (params.buildTrigger == CKBuildTriggerStateUpdate &&
        CKRender::componentHasStateUpdate(component.scopeHandle,
                                          previousParentOrComponent,
                                          params.buildTrigger,
@@ -269,7 +270,7 @@ namespace CKRender {
 
         // Update the `parentHasStateUpdate` param for Faster state/props updates.
         parentHasStateUpdate = parentHasStateUpdate ||
-        (params.buildTrigger == CKBuildTrigger::StateUpdate &&
+        (params.buildTrigger == CKBuildTriggerStateUpdate &&
          CKRender::componentHasStateUpdate(node.scopeHandle,
                                            previousParent,
                                            params.buildTrigger,
@@ -343,14 +344,14 @@ namespace CKRender {
                                __unsafe_unretained id previousParent,
                                CKBuildTrigger buildTrigger,
                                const CKComponentStateUpdateMap& stateUpdates) -> BOOL {
-    if (scopeHandle != nil && previousParent != nil && buildTrigger == CKBuildTrigger::StateUpdate) {
+    if (scopeHandle != nil && previousParent != nil && buildTrigger == CKBuildTriggerStateUpdate) {
       return stateUpdates.find(scopeHandle) != stateUpdates.end();
     }
     return NO;
   }
 
   auto markTreeNodeDirtyIdsFromNodeUntilRoot(CKTreeNodeIdentifier nodeIdentifier,
-                                             CKRootTreeNode &previousRootNode,
+                                             const CKRootTreeNode &previousRootNode,
                                              CKTreeNodeDirtyIds &treeNodesDirtyIds) -> void
   {
     CKTreeNodeIdentifier currentNodeIdentifier = nodeIdentifier;
@@ -370,11 +371,11 @@ namespace CKRender {
 
   auto treeNodeDirtyIdsFor(CKComponentScopeRoot *previousRoot,
                            const CKComponentStateUpdateMap &stateUpdates,
-                           const CKBuildTrigger &buildTrigger) -> CKTreeNodeDirtyIds
+                           CKBuildTrigger buildTrigger) -> CKTreeNodeDirtyIds
   {
     CKTreeNodeDirtyIds treeNodesDirtyIds;
     // Compute the dirtyNodeIds in case of a state update only.
-    if (buildTrigger == CKBuildTrigger::StateUpdate) {
+    if (buildTrigger == CKBuildTriggerStateUpdate) {
       for (auto const & stateUpdate : stateUpdates) {
         CKRender::markTreeNodeDirtyIdsFromNodeUntilRoot(stateUpdate.first.treeNodeIdentifier, previousRoot.rootNode, treeNodesDirtyIds);
       }

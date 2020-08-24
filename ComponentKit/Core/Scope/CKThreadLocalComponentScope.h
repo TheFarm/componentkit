@@ -21,6 +21,7 @@
 #import <ComponentKit/CKBuildComponent.h>
 #import <ComponentKit/CKComponentScopeHandle.h>
 #import <ComponentKit/CKGlobalConfig.h>
+#import <ComponentKit/CKNonNull.h>
 #import <ComponentKit/CKTreeNodeProtocol.h>
 #import <ComponentKit/CKScopeTreeNode.h>
 #import <ComponentKit/CKComponentCoalescingMode.h>
@@ -31,7 +32,7 @@ class CKThreadLocalComponentScope {
 public:
   CKThreadLocalComponentScope(CKComponentScopeRoot *previousScopeRoot,
                               const CKComponentStateUpdateMap &updates,
-                              CKBuildTrigger trigger = CKBuildTrigger::NewTree,
+                              CKBuildTrigger trigger = CKBuildTriggerNone,
                               BOOL enableComponentReuseOptimizations = YES,
                               BOOL shouldCollectTreeNodeCreationInformation = NO,
                               BOOL alwaysBuildRenderTree = NO,
@@ -48,7 +49,7 @@ public:
    */
   static void markCurrentScopeWithRenderComponentInTree();
 
-  CKComponentScopeRoot *const newScopeRoot;
+  CK::NonNull<CKComponentScopeRoot *> const newScopeRoot;
   CKComponentScopeRoot *const previousScopeRoot;
   const CKComponentStateUpdateMap stateUpdates;
   std::stack<CKComponentScopePair> stack;

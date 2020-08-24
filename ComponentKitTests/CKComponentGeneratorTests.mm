@@ -14,7 +14,10 @@
 #import <ComponentKit/CKComponentGenerator.h>
 #import <ComponentKit/CKComponentInternal.h>
 #import <ComponentKit/CKComponentScopeRoot.h>
+#import <ComponentKit/CKIdValueWrapper.h>
 #import <ComponentKit/CKComponentSubclass.h>
+#import <ComponentKit/CKDelayedInitialisationWrapper.h>
+#import <ComponentKit/CKThreadLocalComponentScope.h>
 #import <ComponentKitTestHelpers/CKAnalyticsListenerSpy.h>
 #import <ComponentKitTestHelpers/CKTestRunLoopRunning.h>
 #import <ComponentKitTestHelpers/CKRenderComponentTestHelpers.h>
@@ -40,7 +43,7 @@
 
 @implementation CKComponentGeneratorTests
 {
-  CKBuildComponentResult _asyncComponentGenerationResult;
+  CK::Optional<CKBuildComponentResult> _asyncComponentGenerationResult;
   BOOL _didReceiveComponentStateUpdate;
 }
 
@@ -84,7 +87,7 @@ static CKComponent *verificationComponentProvider(id<NSObject> m, id<NSObject> c
   const auto componentGenerator = [self createComponentGenerator];
   [componentGenerator generateComponentAsynchronously];
   CKRunRunLoopUntilBlockIsTrue(^BOOL{
-    return _asyncComponentGenerationResult.component != nil;
+    return _asyncComponentGenerationResult.hasValue();
   });
 }
 
@@ -138,8 +141,42 @@ static CKComponent *verificationComponentProvider(id<NSObject> m, id<NSObject> c
   const auto event = analyticsListenerSpy->_events.front();
   event.match([&](CK::AnalyticsListenerSpy::DidReceiveStateUpdate drsu){
     XCTAssertEqual(drsu.handle, result1.component.scopeHandle);
-    XCTAssertEqual(drsu.rootID, result1.scopeRoot.globalIdentifier);
+    XCTAssertEqual(drsu.rootID, [result1.scopeRoot globalIdentifier]);
   });
+}
+
+- (void)test_WhenReceivedPropsUpdateAndStateUpdate_BuildTriggerShouldBePropsUpdate
+{
+  const auto componentGenerator =
+  [[CKComponentGenerator alloc] initWithOptions:{
+    .delegate = CK::makeNonNull(self),
+    .componentProvider = CK::makeNonNull([](id<NSObject> m, id<NSObject> c) -> CKComponent *{
+      if (m != [NSNull null]) {
+        auto& model = CKIdValueWrapperGet<CKBuildTrigger>(m);
+        model = CKThreadLocalComponentScope::currentScope()->buildTrigger;
+      }
+      return CK::ComponentBuilder().build();
+    }),
+  }];
+
+  // NewTree
+  [componentGenerator updateModel:[NSNull null]];
+  [componentGenerator updateContext:@1];
+  [componentGenerator generateComponentSynchronously];
+
+  // State Update + Props Update
+  auto modelWrapper = CKIdValueWrapperNonEquatableCreate(CKBuildTrigger{});
+  [componentGenerator updateModel:modelWrapper];
+  const auto stateUpdateListenner = (id<CKComponentStateListener>)componentGenerator;
+  [stateUpdateListenner componentScopeHandle:nil
+                              rootIdentifier:42
+                       didReceiveStateUpdate:^id(id) {
+    return nil;
+  } metadata:{} mode:CKUpdateModeAsynchronous];
+  [componentGenerator generateComponentSynchronously];
+
+  const auto buildTrigger = CKIdValueWrapperGet<CKBuildTrigger>(modelWrapper);
+  XCTAssertEqual(buildTrigger, CKBuildTriggerPropsUpdate | CKBuildTriggerStateUpdate);
 }
 
 #pragma mark - Helpers

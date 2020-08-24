@@ -62,7 +62,7 @@ using namespace CKComponentControllerHelper;
       if (onlySizeRangeChanged) {
         const auto rootLayout = CKComputeRootComponentLayout(item.rootLayout.component(),
                                                              sizeRange,
-                                                             [item scopeRoot].analyticsListener,
+                                                             [[item scopeRoot] analyticsListener],
                                                              CK::none,
                                                              [item scopeRoot]);
         newItem = [[CKDataSourceItem alloc] initWithRootLayout:rootLayout
@@ -71,12 +71,12 @@ using namespace CKComponentControllerHelper;
                                                boundsAnimation:[item boundsAnimation]];
       } else {
         newItem = CKBuildDataSourceItem([item scopeRoot], {}, sizeRange, _configuration, [item model], context);
-        for (const auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
+        for (auto componentController : addedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
                                                                                                      item.scopeRoot,
                                                                                                      &CKComponentControllerInitializeEventPredicate)) {
           [addedComponentControllers addObject:componentController];
         }
-        for (const auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
+        for (auto componentController : removedControllersFromPreviousScopeRootMatchingPredicate(newItem.scopeRoot,
                                                                                                        item.scopeRoot,
                                                                                                        &CKComponentControllerInvalidateEventPredicate)) {
           [invalidComponentControllers addObject:componentController];
