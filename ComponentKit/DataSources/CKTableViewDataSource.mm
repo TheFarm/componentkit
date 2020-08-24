@@ -88,7 +88,7 @@ static void applyChangesToTableView(UITableView *tableView,
 {
   [changes.updatedIndexPaths enumerateObjectsUsingBlock:^(NSIndexPath *indexPath, BOOL *stop) {
     if (CKTableViewDataSourceCell *cell = (CKTableViewDataSourceCell *) [tableView cellForRowAtIndexPath:indexPath]) {
-      attachToCell(cell, [currentState objectAtIndexPath:indexPath], attachController, cellToItemMap, YES);
+      attachToCell(cell, [currentState objectAtIndexPath:indexPath], attachController, cellToItemMap);
     }
   }];
   [tableView deleteRowsAtIndexPaths:[changes.removedIndexPaths allObjects] withRowAnimation:UITableViewRowAnimationNone];
@@ -155,7 +155,7 @@ static void applyChangesToTableView(UITableView *tableView,
         CKDataSourceItem *item = [state objectAtIndexPath:indexPath];
         CKTableViewDataSourceCell *cell = (CKTableViewDataSourceCell *)[_tableView cellForRowAtIndexPath:indexPath];
         if (cell) {
-          attachToCell(cell, item, _attachController, _cellToItemMap, YES);
+          attachToCell(cell, item, _attachController, _cellToItemMap);
         }
       }
     }, nil);
@@ -293,18 +293,16 @@ static NSString *const kReuseIdentifier = @"com.component_kit.table_view_data_so
 static void attachToCell(CKTableViewDataSourceCell *cell,
                          CKDataSourceItem *item,
                          CKComponentAttachController *attachController,
-                         NSMapTable<UITableViewCell *, CKDataSourceItem *> *cellToItemMap,
-                         BOOL isUpdate = NO)
+                         NSMapTable<UITableViewCell *, CKDataSourceItem *> *cellToItemMap)
 {
-  CKComponentAttachControllerAttachComponentRootLayout(
-      attachController,
-      {.layoutProvider = item,
-      .scopeIdentifier = item.scopeRoot.globalIdentifier,
-      .boundsAnimation = item.boundsAnimation,
-      .view = cell.rootView,
-      .analyticsListener = item.scopeRoot.analyticsListener,
-      .isUpdate = isUpdate});
-  [cellToItemMap setObject:item forKey:cell];
+    CKComponentAttachControllerAttachComponentRootLayout(
+        attachController,
+        {.layoutProvider = item,
+         .scopeIdentifier = [item.scopeRoot globalIdentifier],
+         .boundsAnimation = item.boundsAnimation,
+         .view = cell.rootView,
+         .analyticsListener = [item.scopeRoot analyticsListener]});
+    [cellToItemMap setObject:item forKey:cell];
 }
 
 #pragma mark - Internal
